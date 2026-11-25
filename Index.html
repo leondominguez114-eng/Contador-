@@ -1,0 +1,378 @@
+```html
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Control de Puerta · Boliche</title>
+
+  <!-- Google Fonts: Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+          },
+          colors: {
+            amoled: '#09090b',
+            panel: '#111318',
+            card: '#161922',
+          }
+        }
+      }
+    };
+  </script>
+
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+
+  <!-- SheetJS (xlsx) CDN para exportación real a Excel -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+  <style>
+    /* Prevención de zoom por doble toque y selección accidental en móviles */
+    html, body {
+      background-color: #09090b;
+      color: #f4f4f5;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+      overscroll-behavior-y: none;
+    }
+
+    .no-select {
+      -webkit-user-select: none;
+      user-select: none;
+      touch-action: manipulation;
+    }
+
+    .tabular-nums {
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* Animación sutil de pulso al registrar toque */
+    @keyframes tapPop {
+      0% { transform: scale(1); }
+      40% { transform: scale(0.965); }
+      100% { transform: scale(1); }
+    }
+    .tap-pop {
+      animation: tapPop 140ms ease-out;
+    }
+
+    /* Scrollbar oscuro discreto */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #09090b;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #27272a;
+      border-radius: 999px;
+    }
+  </style>
+</head>
+<body class="bg-amoled text-zinc-100 font-sans min-h-screen flex flex-col antialiased selection:bg-sky-500/30">
+
+  <!-- ==================== BARRA SUPERIOR DE NAVEGACIÓN ==================== -->
+  <header class="sticky top-0 z-30 bg-amoled/95 backdrop-blur-md border-b border-zinc-800/80 px-3 py-2.5">
+    <div class="max-w-lg mx-auto flex items-center justify-between gap-2">
+      <!-- Estado de sincronización y código de sala -->
+      <button
+        id="btnOpenSync"
+        type="button"
+        class="no-select flex items-center gap-2 bg-zinc-900 hover:bg-zinc-800 active:scale-95 transition border border-zinc-800 rounded-xl px-2.5 py-1.5 text-left"
+        title="Sincronizar dispositivos"
+      >
+        <span id="syncDot" class="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse shrink-0"></span>
+        <div class="leading-tight">
+          <div class="flex items-center gap-1.5">
+            <span class="text-[10px] uppercase tracking-wider text-zinc-400 font-semibold">Sala</span>
+            <span id="headerRoomCode" class="text-xs font-extrabold tracking-widest text-zinc-100 tabular-nums">------</span>
+          </div>
+          <span id="syncStatusText" class="text-[10px] text-zinc-400 block">Conectando...</span>
+        </div>
+      </button>
+
+      <!-- Reloj + acciones rápidas -->
+      <div class="flex items-center gap-1.5">
+        <!-- Reloj actual y cierre configurado -->
+        <div class="hidden xs:flex flex-col items-end mr-1 leading-tight">
+          <span id="liveClock" class="text-xs font-bold text-zinc-200 tabular-nums">--:--</span>
+          <span id="closingTimeBadge" class="text-[10px] text-zinc-500 tabular-nums">Cierre 05:00</span>
+        </div>
+
+        <!-- Botón Gráficos / Reporte -->
+        <button
+          id="btnOpenReport"
+          type="button"
+          class="no-select flex items-center gap-1.5 bg-indigo-600/20 hover:bg-indigo-600/30 active:scale-95 transition text-indigo-300 border border-indigo-500/40 rounded-xl px-3 py-2 text-xs font-bold"
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />
+          </svg>
+          <span>Reporte</span>
+        </button>
+
+        <!-- Botón Configuración -->
+        <button
+          id="btnOpenSettings"
+          type="button"
+          aria-label="Configuración"
+          class="no-select p-2 bg-zinc-900 hover:bg-zinc-800 active:scale-95 transition text-zinc-300 border border-zinc-800 rounded-xl"
+        >
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ==================== BANNER DE BLOQUEO POR CIERRE AUTOMÁTICO ==================== -->
+  <div id="lockedBanner" class="hidden bg-amber-500/15 border-b border-amber-500/40 px-3 py-2">
+    <div class="max-w-lg mx-auto flex items-center justify-between gap-2">
+      <div class="flex items-center gap-2 text-amber-200 text-xs font-semibold">
+        <svg class="w-4 h-4 text-amber-400 shrink-0" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+        </svg>
+        <span id="lockedBannerText">Noche cerrada · Contador bloqueado</span>
+      </div>
+      <button
+        id="btnUnlockCounter"
+        type="button"
+        class="no-select bg-amber-500 hover:bg-amber-400 active:scale-95 transition text-zinc-950 font-bold text-xs px-3 py-1.5 rounded-lg shrink-0"
+      >
+        Desbloquear
+      </button>
+    </div>
+  </div>
+
+  <!-- ==================== VISTA PRINCIPAL: CONTADOR ==================== -->
+  <main id="counterView" class="flex-1 flex flex-col max-w-lg w-full mx-auto px-3 pt-3 pb-5 gap-3">
+
+    <!-- PANEL SUPERIOR SIEMPRE VISIBLE (TOTALES + PROPORCIÓN) -->
+    <section class="bg-panel border border-zinc-800/90 rounded-2xl p-3.5 shadow-xl shadow-black/40">
+      <!-- Fila principal de 3 métricas -->
+      <div class="grid grid-cols-3 gap-2 items-center text-center">
+        <!-- Total Ingresos -->
+        <div class="bg-zinc-900/90 border border-zinc-800/80 rounded-xl py-2.5 px-2">
+          <p class="text-[10px] uppercase tracking-wider font-bold text-emerald-400/90">Ingresos</p>
+          <p id="statTotalIn" class="text-2xl sm:text-3xl font-extrabold text-zinc-100 tabular-nums leading-tight mt-0.5">0</p>
+        </div>
+
+        <!-- Personas Adentro (Protagonista) -->
+        <div class="bg-gradient-to-b from-zinc-800/90 to-zinc-900 border border-zinc-600/60 rounded-xl py-2.5 px-2 shadow-inner">
+          <p class="text-[10px] uppercase tracking-wider font-extrabold text-white">Adentro</p>
+          <p id="statInsideTotal" class="text-3xl sm:text-4xl font-black text-white tabular-nums leading-tight mt-0.5">0</p>
+        </div>
+
+        <!-- Total Salidas -->
+        <div class="bg-zinc-900/90 border border-zinc-800/80 rounded-xl py-2.5 px-2">
+          <p class="text-[10px] uppercase tracking-wider font-bold text-amber-400/90">Salidas</p>
+          <p id="statTotalOut" class="text-2xl sm:text-3xl font-extrabold text-zinc-100 tabular-nums leading-tight mt-0.5">0</p>
+        </div>
+      </div>
+
+      <!-- Desglose Adentro Hombres vs Mujeres + Barra de Proporción -->
+      <div class="mt-3 pt-3 border-t border-zinc-800/80">
+        <div class="flex items-center justify-between text-xs font-bold mb-1.5">
+          <div class="flex items-center gap-1.5 text-sky-400">
+            <span class="w-2 h-2 rounded-full bg-sky-400"></span>
+            <span>Hombres:</span>
+            <span id="statInsideH" class="text-sm font-extrabold text-sky-300 tabular-nums">0</span>
+            <span id="statPctH" class="text-[11px] font-semibold text-sky-400/80 tabular-nums">(0%)</span>
+          </div>
+          <div class="flex items-center gap-1.5 text-pink-400">
+            <span id="statPctM" class="text-[11px] font-semibold text-pink-400/80 tabular-nums">(0%)</span>
+            <span id="statInsideM" class="text-sm font-extrabold text-pink-300 tabular-nums">0</span>
+            <span>:Mujeres</span>
+            <span class="w-2 h-2 rounded-full bg-pink-500"></span>
+          </div>
+        </div>
+
+        <!-- Barra visual de proporción -->
+        <div class="w-full h-2.5 bg-zinc-800 rounded-full overflow-hidden flex">
+          <div id="barH" class="h-full bg-sky-400 transition-all duration-300" style="width: 50%"></div>
+          <div id="barM" class="h-full bg-pink-500 transition-all duration-300" style="width: 50%"></div>
+        </div>
+
+        <!-- Reloj visible en pantallas muy angostas -->
+        <div class="flex items-center justify-between mt-2 text-[11px] text-zinc-500">
+          <span id="mobileClockRow" class="tabular-nums">Hora: --:-- · Cierre auto: 05:00</span>
+          <span id="lastActionText" class="truncate max-w-[55%] text-right text-zinc-400">Listo para contar</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== SECCIÓN 1: INGRESOS (BOTONES GRANDES) ==================== -->
+    <section class="flex-1 flex flex-col gap-2">
+      <div class="flex items-center justify-between px-1">
+        <div class="flex items-center gap-1.5">
+          <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+          <h2 class="text-xs font-extrabold uppercase tracking-widest text-emerald-400">Ingresos (+1)</h2>
+        </div>
+        <span class="text-[11px] text-zinc-500">Tocá el bloque para sumar</span>
+      </div>
+
+      <div class="grid grid-cols-2 gap-3 flex-1 min-h-[215px]">
+        <!-- BLOQUE INGRESO HOMBRES -->
+        <div class="flex flex-col rounded-2xl border-2 border-sky-500/60 bg-gradient-to-b from-sky-500/20 via-sky-950/50 to-zinc-950 overflow-hidden shadow-lg shadow-sky-950/30">
+          <button
+            id="btnInH"
+            type="button"
+            data-action="in-H"
+            class="counter-btn no-select flex-1 flex flex-col items-center justify-center p-4 active:bg-sky-500/30 transition cursor-pointer focus:outline-none"
+          >
+            <!-- Ícono Hombre -->
+            <div class="w-11 h-11 rounded-full bg-sky-500/20 border border-sky-400/40 flex items-center justify-center mb-2 text-sky-300">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+              </svg>
+            </div>
+            <span class="text-sm font-black uppercase tracking-wider text-sky-300">Hombres</span>
+            <span class="text-4xl sm:text-5xl font-black text-white mt-1 leading-none">+1</span>
+            <span class="mt-3 text-xs font-semibold text-sky-200/80 bg-sky-950/80 border border-sky-500/30 px-2.5 py-0.5 rounded-full tabular-nums">
+              Ingresos: <strong id="countInH" class="text-white">0</strong>
+            </span>
+          </button>
+
+          <!-- Zona separada de corrección -1 -->
+          <div class="bg-zinc-950/90 border-t border-sky-500/25 p-1.5 flex items-center justify-between px-2.5">
+            <span class="text-[10px] text-zinc-500 font-medium">Corregir</span>
+            <button
+              id="btnUndoInH"
+              type="button"
+              class="no-select bg-zinc-900 hover:bg-zinc-800 active:scale-90 transition border border-zinc-700 text-sky-300 font-extrabold text-xs px-3 py-1.5 rounded-lg tabular-nums"
+            >
+              -1
+            </button>
+          </div>
+        </div>
+
+        <!-- BLOQUE INGRESO MUJERES -->
+        <div class="flex flex-col rounded-2xl border-2 border-pink-500/60 bg-gradient-to-b from-pink-500/20 via-fuchsia-950/50 to-zinc-950 overflow-hidden shadow-lg shadow-pink-950/30">
+          <button
+            id="btnInM"
+            type="button"
+            data-action="in-M"
+            class="counter-btn no-select flex-1 flex flex-col items-center justify-center p-4 active:bg-pink-500/30 transition cursor-pointer focus:outline-none"
+          >
+            <!-- Ícono Mujer -->
+            <div class="w-11 h-11 rounded-full bg-pink-500/20 border border-pink-400/40 flex items-center justify-center mb-2 text-pink-300">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+              </svg>
+            </div>
+            <span class="text-sm font-black uppercase tracking-wider text-pink-300">Mujeres</span>
+            <span class="text-4xl sm:text-5xl font-black text-white mt-1 leading-none">+1</span>
+            <span class="mt-3 text-xs font-semibold text-pink-200/80 bg-pink-950/80 border border-pink-500/30 px-2.5 py-0.5 rounded-full tabular-nums">
+              Ingresos: <strong id="countInM" class="text-white">0</strong>
+            </span>
+          </button>
+
+          <!-- Zona separada de corrección -1 -->
+          <div class="bg-zinc-950/90 border-t border-pink-500/25 p-1.5 flex items-center justify-between px-2.5">
+            <span class="text-[10px] text-zinc-500 font-medium">Corregir</span>
+            <button
+              id="btnUndoInM"
+              type="button"
+              class="no-select bg-zinc-900 hover:bg-zinc-800 active:scale-90 transition border border-zinc-700 text-pink-300 font-extrabold text-xs px-3 py-1.5 rounded-lg tabular-nums"
+            >
+              -1
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== SECCIÓN 2: SALIDAS (CLARAMENTE DIFERENCIADA) ==================== -->
+    <section class="flex flex-col gap-2 pt-1">
+      <div class="flex items-center justify-between px-1">
+        <div class="flex items-center gap-1.5">
+          <span class="w-2 h-2 rounded-full bg-amber-400"></span>
+          <h2 class="text-xs font-extrabold uppercase tracking-widest text-amber-400">Salidas</h2>
+        </div>
+        <span class="text-[11px] text-zinc-500">Registra egreso del local</span>
+      </div>
+
+      <div class="grid grid-cols-2 gap-3">
+        <!-- BLOQUE SALIDA HOMBRES -->
+        <div class="flex flex-col rounded-2xl border border-zinc-700/90 bg-panel overflow-hidden">
+          <button
+            id="btnOutH"
+            type="button"
+            data-action="out-H"
+            class="counter-btn no-select flex flex-col items-center justify-center py-4 px-3 active:bg-zinc-800 transition cursor-pointer focus:outline-none"
+          >
+            <div class="flex items-center gap-1.5 text-sky-400">
+              <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
+              </svg>
+              <span class="text-xs font-extrabold uppercase tracking-wider">Salida Hombres</span>
+            </div>
+            <span class="text-2xl font-black text-zinc-100 mt-1.5 leading-none">+1 <span class="text-xs font-semibold text-amber-400">salida</span></span>
+            <span class="mt-2 text-[11px] font-semibold text-zinc-400 bg-zinc-900 border border-zinc-800 px-2.5 py-0.5 rounded-full tabular-nums">
+              Salidas: <strong id="countOutH" class="text-zinc-200">0</strong>
+            </span>
+          </button>
+
+          <div class="bg-zinc-950/80 border-t border-zinc-800 p-1.5 flex items-center justify-between px-2.5">
+            <span class="text-[10px] text-zinc-500 font-medium">Corregir</span>
+            <button
+              id="btnUndoOutH"
+              type="button"
+              class="no-select bg-zinc-900 hover:bg-zinc-800 active:scale-90 transition border border-zinc-700 text-amber-300 font-extrabold text-xs px-3 py-1.5 rounded-lg tabular-nums"
+            >
+              -1
+            </button>
+          </div>
+        </div>
+
+        <!-- BLOQUE SALIDA MUJERES -->
+        <div class="flex flex-col rounded-2xl border border-zinc-700/90 bg-panel overflow-hidden">
+          <button
+            id="btnOutM"
+            type="button"
+            data-action="out-M"
+            class="counter-btn no-select flex flex-col items-center justify-center py-4 px-3 active:bg-zinc-800 transition cursor-pointer focus:outline-none"
+          >
+            <div class="flex items-center gap-1.5 text-pink-400">
+              <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
+              </svg>
+              <span class="text-xs font-extrabold uppercase tracking-wider">Salida Mujeres</span>
+            </div>
+            <span class="text-2xl font-black text-zinc-100 mt-1.5 leading-none">+1 <span class="text-xs font-semibold text-amber-400">salida</span></span>
+            <span class="mt-2 text-[11px] font-semibold text-zinc-400 bg-zinc-900 border border-zinc-800 px-2.5 py-0.5 rounded-full tabular-nums">
+              Salidas: <strong id="countOutM" class="text-zinc-200">0</strong>
+            </span>
+          </button>
+
+          <div class="bg-zinc-950/80 border-t border-zinc-800 p-1.5 flex items-center justify-between px-2.5">
+            <span class="text-[10px] text-zinc-500 font-medium">Corregir</span>
+            <button
+              id="btnUndoOutM"
+              type="button"
+              class="no-select bg-zinc-900 hover:bg-zinc-800 active:scale-90 transition border border-zinc-700 text-amber-300 font-extrabold text-xs px-3 py-1.5 rounded-lg tabular-nums"
+            >
+              -1
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ==================== VISTA DE REPORTE Y GRÁFICOS ==================== -->
+  <section id="reportView" class="hidden flex-1 flex-col max-w-2xl w-full mx-auto px-3 
