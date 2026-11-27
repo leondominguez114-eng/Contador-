@@ -1,0 +1,3323 @@
+```html
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#09090b" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>Control de Puerta · Multi-Boliche</title>
+
+  <!-- Google Fonts: Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+          },
+          colors: {
+            amoled: '#09090b',
+            panel: '#111318',
+            card: '#161922',
+          }
+        }
+      }
+    };
+  </script>
+
+  <!-- Chart.js v4 CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+
+  <!-- SheetJS (xlsx) CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+  <style>
+    /* Configuración base AMOLED y ergonomía táctil para celulares */
+    html, body {
+      background-color: #09090b;
+      color: #f4f4f5;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+      overscroll-behavior-y: none;
+    }
+
+    .no-select {
+      -webkit-user-select: none;
+      user-select: none;
+      touch-action: manipulation;
+    }
+
+    .tabular-nums {
+      font-variant-numeric: tabular-nums;
+    }
+
+    @keyframes tapPop {
+      0% { transform: scale(1); }
+      45% { transform: scale(0.96); }
+      100% { transform: scale(1); }
+    }
+    .tap-pop {
+      animation: tapPop 140ms ease-out;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .fade-in {
+      animation: fadeIn 180ms ease-out;
+    }
+
+    /* Scrollbar minimalista oscuro */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #09090b;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #27272a;
+      border-radius: 999px;
+    }
+
+    /* Espacio seguro para barra inferior en iOS/Android */
+    .pb-safe {
+      padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+    }
+  </style>
+</head>
+<body class="bg-amoled text-zinc-100 font-sans min-h-screen flex flex-col antialiased selection:bg-sky-500/30">
+
+  <!-- ==================== PANTALLA DE CARGA INICIAL ==================== -->
+  <div id="splashScreen" class="fixed inset-0 z-50 bg-amoled flex flex-col items-center justify-center gap-4 px-6">
+    <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-sky-500/20 to-pink-500/20 border border-zinc-800 flex items-center justify-center shadow-2xl">
+      <svg class="w-7 h-7 text-sky-400 animate-pulse" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
+      </svg>
+    </div>
+    <div class="text-center">
+      <p class="text-sm font-extrabold tracking-tight text-white">Control de Puerta</p>
+      <p class="text-xs text-zinc-500 mt-1">Verificando sesión...</p>
+    </div>
+  </div>
+
+  <!-- ==================== 1. PANTALLA DE LOGIN ==================== -->
+  <section id="loginView" class="hidden flex-1 flex items-center justify-center px-4 py-8">
+    <div class="w-full max-w-sm bg-panel border border-zinc-800/90 rounded-3xl p-6 shadow-2xl shadow-black/70 fade-in">
+      <!-- Logo y título -->
+      <div class="flex flex-col items-center text-center mb-6">
+        <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-sky-500/20 via-zinc-900 to-pink-500/20 border border-zinc-700/80 flex items-center justify-center mb-3 shadow-lg">
+          <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" stroke-width="2.1" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m.94 3.198l.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0112 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 016 18.719m12 0a5.971 5.971 0 00-.941-3.197m0 0A5.995 5.995 0 0012 12.75a5.995 5.995 0 00-5.058 2.772m0 0a3 3 0 00-4.681 2.72 8.986 8.986 0 003.74.477m.94-3.197a5.971 5.971 0 00-.94 3.197M15 6.75a3 3 0 11-6 0 3 3 0 016 0zm6 3a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0zm-13.5 0a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z" />
+          </svg>
+        </div>
+        <h1 class="text-xl font-black tracking-tight text-white">Control de Puerta</h1>
+        <p class="text-xs text-zinc-400 mt-1">Sistema de conteo y analítica multi-boliche</p>
+      </div>
+
+      <!-- Mensaje de error -->
+      <div id="loginErrorBox" class="hidden mb-4 bg-rose-500/15 border border-rose-500/40 text-rose-200 text-xs font-semibold rounded-xl px-3.5 py-2.5 leading-relaxed"></div>
+
+      <!-- Formulario -->
+      <form id="loginForm" class="space-y-4" novalidate>
+        <div>
+          <label for="loginEmail" class="block text-xs font-bold text-zinc-300 mb-1.5">Correo electrónico</label>
+          <input
+            id="loginEmail"
+            type="email"
+            autocomplete="email"
+            required
+            placeholder="nombre@correo.com"
+            class="w-full bg-zinc-950 border border-zinc-800 focus:border-sky-500 focus:outline-none rounded-xl px-3.5 py-3 text-sm text-white placeholder-zinc-600 transition"
+          />
+        </div>
+
+        <div>
+          <label for="loginPassword" class="block text-xs font-bold text-zinc-300 mb-1.5">Contraseña</label>
+          <div class="relative">
+            <input
+              id="loginPassword"
+              type="password"
+              autocomplete="current-password"
+              required
+              placeholder="••••••••"
+              class="w-full bg-zinc-950 border border-zinc-800 focus:border-sky-500 focus:outline-none rounded-xl pl-3.5 pr-11 py-3 text-sm text-white placeholder-zinc-600 transition"
+            />
+            <button
+              id="btnTogglePassword"
+              type="button"
+              aria-label="Mostrar u ocultar contraseña"
+              class="no-select absolute right-2 top-1/2 -translate-y-1/2 p-2 text-zinc-400 hover:text-zinc-200 rounded-lg"
+            >
+              <svg id="eyeIconShow" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+              <svg id="eyeIconHide" class="w-4 h-4 hidden" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <button
+          id="btnLoginSubmit"
+          type="submit"
+          class="no-select w-full bg-gradient-to-r from-sky-500 to-indigo-500 hover:from-sky-400 hover:to-indigo-400 active:scale-[0.98] transition text-white font-extrabold text-sm py-3.5 rounded-xl shadow-lg shadow-sky-950/50 flex items-center justify-center gap-2"
+        >
+          <span id="loginBtnText">Ingresar</span>
+          <svg id="loginBtnSpinner" class="hidden w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+          </svg>
+        </button>
+      </form>
+
+      <p class="text-[11px] text-zinc-500 text-center mt-5">
+        Acceso exclusivo para personal y administración autorizada.
+      </p>
+    </div>
+  </section>
+
+  <!-- ==================== 2. VISTA OPERADOR (PUERTA) ==================== -->
+  <section id="operatorView" class="hidden flex-1 flex flex-col min-h-screen">
+    <!-- Barra superior del Operador -->
+    <header class="sticky top-0 z-30 bg-amoled/95 backdrop-blur-md border-b border-zinc-800/80 px-3 py-2.5">
+      <div class="max-w-lg mx-auto flex items-center justify-between gap-2">
+        <div class="min-w-0 flex-1">
+          <div class="flex items-center gap-2">
+            <h1 id="opVenueName" class="text-sm font-black text-white truncate">Cargando boliche...</h1>
+          </div>
+          <div class="flex items-center gap-2 mt-0.5">
+            <span id="opConnDot" class="w-2 h-2 rounded-full bg-emerald-400 shrink-0"></span>
+            <span id="opConnText" class="text-[11px] text-zinc-400 truncate">En línea</span>
+            <span class="text-zinc-700">·</span>
+            <span id="opUserBadge" class="text-[11px] font-semibold text-sky-400 truncate">Operador</span>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2 shrink-0">
+          <div class="text-right leading-tight">
+            <span id="opLiveClock" class="block text-xs font-extrabold text-zinc-200 tabular-nums">--:--</span>
+            <span id="opCloseBadge" class="block text-[10px] text-zinc-500 tabular-nums">Cierre 05:00</span>
+          </div>
+          <button
+            id="btnOpLogout"
+            type="button"
+            aria-label="Cerrar sesión"
+            class="no-select p-2 bg-zinc-900 hover:bg-zinc-800 active:scale-95 transition border border-zinc-800 text-zinc-300 rounded-xl"
+          >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" />
+            </svg>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Contenido principal del Operador -->
+    <main class="flex-1 flex flex-col max-w-lg w-full mx-auto px-3 pt-3 pb-5 gap-3">
+      <!-- Estado sin boliche asignado -->
+      <div id="opNoVenueCard" class="hidden my-auto bg-panel border border-zinc-800 rounded-2xl p-6 text-center">
+        <div class="w-12 h-12 mx-auto rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 mb-3">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+          </svg>
+        </div>
+        <h2 class="text-base font-extrabold text-white">Sin boliche asignado</h2>
+        <p class="text-xs text-zinc-400 mt-1.5">Tu cuenta todavía no tiene un local activo asociado. Pedile al administrador que te asigne un boliche.</p>
+      </div>
+
+      <!-- HUD Superior (siempre visible cuando hay boliche) -->
+      <div id="opMainContainer" class="flex-1 flex flex-col gap-3">
+        <section class="bg-panel border border-zinc-800/90 rounded-2xl p-3.5 shadow-xl shadow-black/40">
+          <div class="grid grid-cols-3 gap-2 items-center text-center">
+            <div class="bg-zinc-900/90 border border-zinc-800/80 rounded-xl py-2.5 px-2">
+              <p class="text-[10px] uppercase tracking-wider font-bold text-emerald-400/90">Ingresos</p>
+              <p id="opStatIn" class="text-2xl sm:text-3xl font-extrabold text-zinc-100 tabular-nums leading-tight mt-0.5">0</p>
+            </div>
+            <div class="bg-gradient-to-b from-zinc-800/90 to-zinc-900 border border-zinc-600/60 rounded-xl py-2.5 px-2 shadow-inner">
+              <p class="text-[10px] uppercase tracking-wider font-extrabold text-white">Adentro</p>
+              <p id="opStatInside" class="text-3xl sm:text-4xl font-black text-white tabular-nums leading-tight mt-0.5">0</p>
+            </div>
+            <div class="bg-zinc-900/90 border border-zinc-800/80 rounded-xl py-2.5 px-2">
+              <p class="text-[10px] uppercase tracking-wider font-bold text-amber-400/90">Salidas</p>
+              <p id="opStatOut" class="text-2xl sm:text-3xl font-extrabold text-zinc-100 tabular-nums leading-tight mt-0.5">0</p>
+            </div>
+          </div>
+
+          <!-- Proporción Hombres / Mujeres -->
+          <div class="mt-3 pt-3 border-t border-zinc-800/80">
+            <div class="flex items-center justify-between text-xs font-bold mb-1.5">
+              <div class="flex items-center gap-1.5 text-sky-400">
+                <span class="w-2 h-2 rounded-full bg-sky-400"></span>
+                <span>Hombres:</span>
+                <span id="opInsideM" class="text-sm font-extrabold text-sky-300 tabular-nums">0</span>
+                <span id="opPctM" class="text-[11px] font-semibold text-sky-400/80 tabular-nums">(0%)</span>
+              </div>
+              <div class="flex items-center gap-1.5 text-pink-400">
+                <span id="opPctF" class="text-[11px] font-semibold text-pink-400/80 tabular-nums">(0%)</span>
+                <span id="opInsideF" class="text-sm font-extrabold text-pink-300 tabular-nums">0</span>
+                <span>:Mujeres</span>
+                <span class="w-2 h-2 rounded-full bg-pink-500"></span>
+              </div>
+            </div>
+            <div class="w-full h-2.5 bg-zinc-800 rounded-full overflow-hidden flex">
+              <div id="opBarM" class="h-full bg-sky-400 transition-all duration-300" style="width: 50%"></div>
+              <div id="opBarF" class="h-full bg-pink-500 transition-all duration-300" style="width: 50%"></div>
+            </div>
+            <div class="flex items-center justify-between mt-2 text-[11px] text-zinc-500">
+              <span id="opSessionInfo" class="tabular-nums">Noche activa</span>
+              <span id="opLastAction" class="truncate max-w-[58%] text-right text-zinc-400">Listo para contar</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- Tarjeta de Bloqueo por Cierre Automático / Pausa -->
+        <section id="opLockedCard" class="hidden flex-1 flex flex-col items-center justify-center bg-panel border border-amber-500/40 rounded-2xl p-6 text-center shadow-xl">
+          <div class="w-14 h-14 rounded-2xl bg-amber-500/15 border border-amber-500/40 flex items-center justify-center text-amber-400 mb-3">
+            <svg class="w-7 h-7" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+            </svg>
+          </div>
+          <h2 class="text-lg font-black text-white">Noche finalizada</h2>
+          <span id="opLockedReason" class="mt-2 inline-flex items-center px-3 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs font-bold">
+            Cierre automático 05:00 hs
+          </span>
+          <p class="text-xs text-zinc-400 mt-4 max-w-xs leading-relaxed">
+            Los gráficos y reportes están disponibles únicamente en el panel de administración.
+          </p>
+        </section>
+
+        <!-- Botonera Activa de Ingresos y Salidas -->
+        <div id="opButtonsArea" class="flex-1 flex flex-col gap-3">
+          <!-- INGRESOS -->
+          <section class="flex-1 flex flex-col gap-2">
+            <div class="flex items-center justify-between px-1">
+              <div class="flex items-center gap-1.5">
+                <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+                <h2 class="text-xs font-extrabold uppercase tracking-widest text-emerald-400">Ingresos (+1)</h2>
+              </div>
+              <span class="text-[11px] text-zinc-500">Tocá el bloque para sumar</span>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3 flex-1 min-h-[215px]">
+              <!-- INGRESO HOMBRES -->
+              <div class="flex flex-col rounded-2xl border-2 border-sky-500/60 bg-gradient-to-b from-sky-500/20 via-sky-950/50 to-zinc-950 overflow-hidden shadow-lg shadow-sky-950/30">
+                <button
+                  id="btnOpInM"
+                  type="button"
+                  class="no-select flex-1 flex flex-col items-center justify-center p-4 active:bg-sky-500/30 transition cursor-pointer focus:outline-none"
+                >
+                  <div class="w-11 h-11 rounded-full bg-sky-500/20 border border-sky-400/40 flex items-center justify-center mb-2 text-sky-300">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+                    </svg>
+                  </div>
+                  <span class="text-sm font-black uppercase tracking-wider text-sky-300">Hombres</span>
+                  <span class="text-4xl sm:text-5xl font-black text-white mt-1 leading-none">+1</span>
+                  <span class="mt-3 text-xs font-semibold text-sky-200/85 bg-sky-950/80 border border-sky-500/30 px-2.5 py-0.5 rounded-full tabular-nums">
+                    Ingresos: <strong id="opCountInM" class="text-white">0</strong>
+                  </span>
+                </button>
+                <div class="bg-zinc-950/90 border-t border-sky-500/25 p-1.5 flex items-center justify-between px-2.5">
+                  <span class="text-[10px] text-zinc-500 font-medium">Corregir</span>
+                  <button
+                    id="btnOpUndoInM"
+                    type="button"
+                    class="no-select bg-zinc-900 hover:bg-zinc-800 active:scale-90 transition border border-zinc-700 text-sky-300 font-extrabold text-xs px-3 py-1.5 rounded-lg tabular-nums"
+                  >
+                    -1
+                  </button>
+                </div>
+              </div>
+
+              <!-- INGRESO MUJERES -->
+              <div class="flex flex-col rounded-2xl border-2 border-pink-500/60 bg-gradient-to-b from-pink-500/20 via-fuchsia-950/50 to-zinc-950 overflow-hidden shadow-lg shadow-pink-950/30">
+                <button
+                  id="btnOpInF"
+                  type="button"
+                  class="no-select flex-1 flex flex-col items-center justify-center p-4 active:bg-pink-500/30 transition cursor-pointer focus:outline-none"
+                >
+                  <div class="w-11 h-11 rounded-full bg-pink-500/20 border border-pink-400/40 flex items-center justify-center mb-2 text-pink-300">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+                    </svg>
+                  </div>
+                  <span class="text-sm font-black uppercase tracking-wider text-pink-300">Mujeres</span>
+                  <span class="text-4xl sm:text-5xl font-black text-white mt-1 leading-none">+1</span>
+                  <span class="mt-3 text-xs font-semibold text-pink-200/85 bg-pink-950/80 border border-pink-500/30 px-2.5 py-0.5 rounded-full tabular-nums">
+                    Ingresos: <strong id="opCountInF" class="text-white">0</strong>
+                  </span>
+                </button>
+                <div class="bg-zinc-950/90 border-t border-pink-500/25 p-1.5 flex items-center justify-between px-2.5">
+                  <span class="text-[10px] text-zinc-500 font-medium">Corregir</span>
+                  <button
+                    id="btnOpUndoInF"
+                    type="button"
+                    class="no-select bg-zinc-900 hover:bg-zinc-800 active:scale-90 transition border border-zinc-700 text-pink-300 font-extrabold text-xs px-3 py-1.5 rounded-lg tabular-nums"
+                  >
+                    -1
+                  </button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- SALIDAS -->
+          <section class="flex flex-col gap-2 pt-1">
+            <div class="flex items-center justify-between px-1">
+              <div class="flex items-center gap-1.5">
+                <span class="w-2 h-2 rounded-full bg-amber-400"></span>
+                <h2 class="text-xs font-extrabold uppercase tracking-widest text-amber-400">Salidas</h2>
+              </div>
+              <span class="text-[11px] text-zinc-500">Registra egreso del local</span>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+              <!-- SALIDA HOMBRES -->
+              <div class="flex flex-col rounded-2xl border border-zinc-700/90 bg-panel overflow-hidden">
+                <button
+                  id="btnOpOutM"
+                  type="button"
+                  class="no-select flex flex-col items-center justify-center py-4 px-3 active:bg-zinc-800 transition cursor-pointer focus:outline-none"
+                >
+                  <div class="flex items-center gap-1.5 text-sky-400">
+                    <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
+                    </svg>
+                    <span class="text-xs font-extrabold uppercase tracking-wider">Salida Hombres</span>
+                  </div>
+                  <span class="text-2xl font-black text-zinc-100 mt-1.5 leading-none">+1 <span class="text-xs font-semibold text-amber-400">salida</span></span>
+                  <span class="mt-2 text-[11px] font-semibold text-zinc-400 bg-zinc-900 border border-zinc-800 px-2.5 py-0.5 rounded-full tabular-nums">
+                    Salidas: <strong id="opCountOutM" class="text-zinc-200">0</strong>
+                  </span>
+                </button>
+                <div class="bg-zinc-950/80 border-t border-zinc-800 p-1.5 flex items-center justify-between px-2.5">
+                  <span class="text-[10px] text-zinc-500 font-medium">Corregir</span>
+                  <button
+                    id="btnOpUndoOutM"
+                    type="button"
+                    class="no-select bg-zinc-900 hover:bg-zinc-800 active:scale-90 transition border border-zinc-700 text-amber-300 font-extrabold text-xs px-3 py-1.5 rounded-lg tabular-nums"
+                  >
+                    -1
+                  </button>
+                </div>
+              </div>
+
+              <!-- SALIDA MUJERES -->
+              <div class="flex flex-col rounded-2xl border border-zinc-700/90 bg-panel overflow-hidden">
+                <button
+                  id="btnOpOutF"
+                  type="button"
+                  class="no-select flex flex-col items-center justify-center py-4 px-3 active:bg-zinc-800 transition cursor-pointer focus:outline-none"
+                >
+                  <div class="flex items-center gap-1.5 text-pink-400">
+                    <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
+                    </svg>
+                    <span class="text-xs font-extrabold uppercase tracking-wider">Salida Mujeres</span>
+                  </div>
+                  <span class="text-2xl font-black text-zinc-100 mt-1.5 leading-none">+1 <span class="text-xs font-semibold text-amber-400">salida</span></span>
+                  <span class="mt-2 text-[11px] font-semibold text-zinc-400 bg-zinc-900 border border-zinc-800 px-2.5 py-0.5 rounded-full tabular-nums">
+                    Salidas: <strong id="opCountOutF" class="text-zinc-200">0</strong>
+                  </span>
+                </button>
+                <div class="bg-zinc-950/80 border-t border-zinc-800 p-1.5 flex items-center justify-between px-2.5">
+                  <span class="text-[10px] text-zinc-500 font-medium">Corregir</span>
+                  <button
+                    id="btnOpUndoOutF"
+                    type="button"
+                    class="no-select bg-zinc-900 hover:bg-zinc-800 active:scale-90 transition border border-zinc-700 text-amber-300 font-extrabold text-xs px-3 py-1.5 rounded-lg tabular-nums"
+                  >
+                    -1
+                  </button>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </main>
+  </section>
+
+  <!-- ==================== 3. PANEL SUPER ADMIN Y PROPIETARIO ==================== -->
+  <section id="dashboardView" class="hidden flex-1 flex flex-col min-h-screen pb-24">
+    <!-- Header Dashboard -->
+    <header class="sticky top-0 z-30 bg-amoled/95 backdrop-blur-md border-b border-zinc-800/80 px-3.5 py-3">
+      <div class="max-w-4xl mx-auto flex items-center justify-between gap-2">
+        <div class="min-w-0">
+          <div class="flex items-center gap-2">
+            <span id="dashRoleBadge" class="px-2 py-0.5 rounded-md text-[10px] font-extrabold uppercase tracking-wider bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+              Super Admin
+            </span>
+            <h1 id="dashTitle" class="text-sm sm:text-base font-black text-white truncate">Panel Super Admin</h1>
+          </div>
+          <p id="dashSubtitle" class="text-[11px] text-zinc-400 truncate mt-0.5">adminpuertas1@gmail.com</p>
+        </div>
+
+        <div class="flex items-center gap-2 shrink-0">
+          <span id="dashClock" class="text-xs font-bold text-zinc-300 bg-zinc-900 border border-zinc-800 px-2.5 py-1.5 rounded-xl tabular-nums">--:--</span>
+          <button
+            id="btnDashLogout"
+            type="button"
+            class="no-select flex items-center gap-1.5 bg-zinc-900 hover:bg-zinc-800 active:scale-95 transition border border-zinc-800 text-zinc-300 text-xs font-bold px-3 py-1.5 rounded-xl"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" />
+            </svg>
+            <span class="hidden sm:inline">Salir</span>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Contenido Dinámico por Pestaña -->
+    <main class="flex-1 max-w-4xl w-full mx-auto px-3.5 pt-4 space-y-4">
+
+      <!-- TAB: EN VIVO -->
+      <div id="tabLive" class="space-y-4">
+        <!-- Resumen global de todos los locales visibles -->
+        <div class="grid grid-cols-3 gap-2.5 bg-panel border border-zinc-800 rounded-2xl p-3">
+          <div class="text-center">
+            <span class="text-[10px] uppercase tracking-wider font-bold text-zinc-400">Locales</span>
+            <p id="liveSummaryVenues" class="text-xl font-black text-white tabular-nums mt-0.5">0</p>
+          </div>
+          <div class="text-center border-x border-zinc-800">
+            <span class="text-[10px] uppercase tracking-wider font-bold text-emerald-400">Adentro Total</span>
+            <p id="liveSummaryInside" class="text-xl font-black text-white tabular-nums mt-0.5">0</p>
+          </div>
+          <div class="text-center">
+            <span class="text-[10px] uppercase tracking-wider font-bold text-sky-400">Ingresos Total</span>
+            <p id="liveSummaryIn" class="text-xl font-black text-white tabular-nums mt-0.5">0</p>
+          </div>
+        </div>
+
+        <!-- Grid de tarjetas de boliches en vivo -->
+        <div id="liveVenuesGrid" class="grid grid-cols-1 md:grid-cols-2 gap-3.5"></div>
+      </div>
+
+      <!-- TAB: BOLICHES (Solo Super Admin) -->
+      <div id="tabVenues" class="hidden space-y-4">
+        <div class="flex items-center justify-between gap-2">
+          <div>
+            <h2 class="text-base font-extrabold text-white">Gestión de Boliches</h2>
+            <p class="text-xs text-zinc-400">Configurá cierres, pausas y nuevas noches</p>
+          </div>
+          <button
+            id="btnNewVenue"
+            type="button"
+            class="no-select flex items-center gap-1.5 bg-sky-600 hover:bg-sky-500 active:scale-95 transition text-white text-xs font-extrabold px-3.5 py-2.5 rounded-xl shadow-lg shadow-sky-950/40 shrink-0"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+            </svg>
+            <span>Nuevo Boliche</span>
+          </button>
+        </div>
+        <div id="venuesManageList" class="space-y-3"></div>
+      </div>
+
+      <!-- TAB: USUARIOS (Solo Super Admin) -->
+      <div id="tabUsers" class="hidden space-y-4">
+        <div class="flex items-center justify-between gap-2">
+          <div>
+            <h2 class="text-base font-extrabold text-white">Usuarios y Accesos</h2>
+            <p class="text-xs text-zinc-400">Operadores de puerta y dueños de boliche</p>
+          </div>
+          <button
+            id="btnNewUser"
+            type="button"
+            class="no-select flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-500 active:scale-95 transition text-white text-xs font-extrabold px-3.5 py-2.5 rounded-xl shadow-lg shadow-indigo-950/40 shrink-0"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M19 7.5v3m0 0v3m0-3h3m-3 0h-3m-2.25-4.125a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zM4 19.235v-.11a6.375 6.375 0 0112.75 0v.109A12.318 12.318 0 0110.374 21c-2.331 0-4.512-.645-6.374-1.766z" />
+            </svg>
+            <span>Nuevo Usuario</span>
+          </button>
+        </div>
+        <div id="usersManageList" class="space-y-3"></div>
+      </div>
+
+      <!-- TAB: HISTORIAL (Super Admin y Propietario) -->
+      <div id="tabHistory" class="hidden space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h2 class="text-base font-extrabold text-white">Historial de Noches</h2>
+            <p class="text-xs text-zinc-400">Reportes archivados por boliche y fecha</p>
+          </div>
+          <div class="flex items-center gap-2 w-full sm:w-auto">
+            <select
+              id="historyVenueFilter"
+              class="flex-1 sm:w-52 bg-panel border border-zinc-800 focus:border-sky-500 focus:outline-none text-xs font-bold text-zinc-200 rounded-xl px-3 py-2.5"
+            >
+              <option value="ALL">Todos los boliches</option>
+            </select>
+            <button
+              id="btnRefreshHistory"
+              type="button"
+              aria-label="Actualizar historial"
+              class="no-select p-2.5 bg-panel hover:bg-zinc-800 active:scale-95 transition border border-zinc-800 text-zinc-300 rounded-xl"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <div id="historyList" class="space-y-3"></div>
+      </div>
+    </main>
+
+    <!-- Barra de Navegación Inferior Fija (Móvil / Desktop) -->
+    <nav class="fixed bottom-0 inset-x-0 z-30 bg-panel/95 backdrop-blur-lg border-t border-zinc-800/90 px-2 pt-2 pb-safe">
+      <div id="dashNavGrid" class="max-w-lg mx-auto grid grid-cols-4 gap-1">
+        <button data-tab="live" type="button" class="dash-nav-btn no-select flex flex-col items-center justify-center py-1.5 rounded-xl text-sky-400 bg-sky-500/10 transition">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.1" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
+          </svg>
+          <span class="text-[10px] font-bold mt-0.5">En Vivo</span>
+        </button>
+
+        <button id="navBtnVenues" data-tab="venues" type="button" class="dash-nav-btn no-select flex flex-col items-center justify-center py-1.5 rounded-xl text-zinc-400 hover:text-zinc-200 transition">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.1" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h1.5m-1.5 3h1.5m-1.5 3h1.5m3-6H15m-1.5 3H15m-1.5 3H15M9 21v-3.375c0-.621.504-1.125 1.125-1.125h3.75c.621 0 1.125.504 1.125 1.125V21" />
+          </svg>
+          <span class="text-[10px] font-bold mt-0.5">Boliches</span>
+        </button>
+
+        <button id="navBtnUsers" data-tab="users" type="button" class="dash-nav-btn no-select flex flex-col items-center justify-center py-1.5 rounded-xl text-zinc-400 hover:text-zinc-200 transition">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.1" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
+          </svg>
+          <span class="text-[10px] font-bold mt-0.5">Usuarios</span>
+        </button>
+
+        <button data-tab="history" type="button" class="dash-nav-btn no-select flex flex-col items-center justify-center py-1.5 rounded-xl text-zinc-400 hover:text-zinc-200 transition">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.1" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <span class="text-[10px] font-bold mt-0.5">Historial</span>
+        </button>
+      </div>
+    </nav>
+  </section>
+
+  <!-- ==================== MODAL: CREAR / EDITAR BOLICHE ==================== -->
+  <div id="venueModal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-3">
+    <div class="bg-panel border border-zinc-800 rounded-2xl w-full max-w-md p-4 shadow-2xl max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between mb-4">
+        <h3 id="venueModalTitle" class="text-base font-extrabold text-white">Nuevo Boliche</h3>
+        <button data-close="venueModal" type="button" class="no-select p-1.5 text-zinc-400 hover:text-white rounded-lg">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <form id="venueForm" class="space-y-4">
+        <input id="venueFormId" type="hidden" />
+
+        <div>
+          <label for="venueFormName" class="block text-xs font-bold text-zinc-300 mb-1.5">Nombre del boliche</label>
+          <input
+            id="venueFormName"
+            type="text"
+            required
+            placeholder="Ej: Studio Theater / Club Paraguay"
+            class="w-full bg-zinc-950 border border-zinc-800 focus:border-sky-500 focus:outline-none rounded-xl px-3.5 py-2.5 text-sm text-white"
+          />
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label for="venueFormCloseTime" class="block text-xs font-bold text-zinc-300 mb-1.5">Cierre automático</label>
+            <input
+              id="venueFormCloseTime"
+              type="time"
+              value="05:00"
+              required
+              class="w-full bg-zinc-950 border border-zinc-800 focus:border-sky-500 focus:outline-none rounded-xl px-3 py-2.5 text-sm font-bold text-white"
+            />
+          </div>
+          <div>
+            <label for="venueFormInterval" class="block text-xs font-bold text-zinc-300 mb-1.5">Franja gráficos</label>
+            <select
+              id="venueFormInterval"
+              class="w-full bg-zinc-950 border border-zinc-800 focus:border-sky-500 focus:outline-none rounded-xl px-3 py-2.5 text-sm font-bold text-white"
+            >
+              <option value="15">Cada 15 min</option>
+              <option value="30">Cada 30 min</option>
+            </select>
+          </div>
+        </div>
+
+        <label class="no-select flex items-center justify-between bg-zinc-950 border border-zinc-800 rounded-xl px-3.5 py-3 cursor-pointer">
+          <div>
+            <span class="block text-xs font-bold text-zinc-200">Boliche activo</span>
+            <span class="block text-[11px] text-zinc-500">Si se desactiva, bloquea el contador de puerta</span>
+          </div>
+          <input id="venueFormActive" type="checkbox" checked class="w-5 h-5 accent-sky-500 rounded" />
+        </label>
+
+        <div class="flex gap-2 pt-2">
+          <button data-close="venueModal" type="button" class="no-select flex-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-bold text-xs py-3 rounded-xl">
+            Cancelar
+          </button>
+          <button id="btnSaveVenue" type="submit" class="no-select flex-1 bg-sky-600 hover:bg-sky-500 text-white font-extrabold text-xs py-3 rounded-xl">
+            Guardar
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL: CERRAR / INICIAR NUEVA NOCHE ==================== -->
+  <div id="sessionModal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-3">
+    <div class="bg-panel border border-zinc-800 rounded-2xl w-full max-w-md p-4 shadow-2xl">
+      <div class="flex items-center justify-between mb-3">
+        <div>
+          <h3 class="text-base font-extrabold text-white">Control de Noche</h3>
+          <p id="sessionModalVenueName" class="text-xs text-sky-400 font-bold mt-0.5">Boliche</p>
+        </div>
+        <button data-close="sessionModal" type="button" class="no-select p-1.5 text-zinc-400 hover:text-white rounded-lg">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <div id="sessionModalSummary" class="bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-xs text-zinc-300 mb-4 space-y-1"></div>
+
+      <div class="space-y-3">
+        <!-- Opción 1: Cerrar y archivar sin abrir una nueva -->
+        <button
+          id="btnSessionArchiveClose"
+          type="button"
+          class="no-select w-full flex items-center justify-between bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/40 text-amber-200 px-4 py-3 rounded-xl text-left transition"
+        >
+          <div>
+            <span class="block text-xs font-extrabold">Cerrar y Archivar Noche Actual</span>
+            <span class="block text-[11px] text-amber-200/70">Guarda el reporte en el historial y bloquea la puerta</span>
+          </div>
+          <svg class="w-5 h-5 shrink-0 text-amber-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5m8.25 3v6.75m0 0l-3-3m3 3l3-3M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
+          </svg>
+        </button>
+
+        <!-- Opción 2: Iniciar nueva noche en 0 -->
+        <div class="bg-zinc-950 border border-emerald-500/30 rounded-xl p-3.5 space-y-3">
+          <div class="flex items-start justify-between gap-2">
+            <div>
+              <span class="block text-xs font-extrabold text-emerald-300">Iniciar Nueva Noche (en 0)</span>
+              <span class="block text-[11px] text-zinc-400">Reinicia contadores y habilita la puerta hasta el próximo cierre automático</span>
+            </div>
+          </div>
+
+          <label id="sessionArchiveCheckboxRow" class="no-select flex items-center gap-2.5 text-xs text-zinc-200 cursor-pointer">
+            <input id="sessionArchiveBeforeReset" type="checkbox" checked class="w-4 h-4 accent-emerald-500 rounded" />
+            <span>Archivar la noche actual en el historial antes de reiniciar</span>
+          </label>
+
+          <button
+            id="btnSessionStartNew"
+            type="button"
+            class="no-select w-full bg-emerald-600 hover:bg-emerald-500 active:scale-95 transition text-white font-extrabold text-xs py-2.5 rounded-xl"
+          >
+            Iniciar Nueva Noche
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL: CREAR / EDITAR USUARIO ==================== -->
+  <div id="userModal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-3">
+    <div class="bg-panel border border-zinc-800 rounded-2xl w-full max-w-md p-4 shadow-2xl max-h-[92vh] overflow-y-auto">
+      <div class="flex items-center justify-between mb-4">
+        <h3 id="userModalTitle" class="text-base font-extrabold text-white">Nuevo Usuario</h3>
+        <button data-close="userModal" type="button" class="no-select p-1.5 text-zinc-400 hover:text-white rounded-lg">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <form id="userForm" class="space-y-3.5">
+        <input id="userFormMode" type="hidden" value="create" />
+
+        <div>
+          <label for="userFormName" class="block text-xs font-bold text-zinc-300 mb-1">Nombre / Etiqueta</label>
+          <input
+            id="userFormName"
+            type="text"
+            required
+            placeholder="Ej: Puerta 1 - Marcos / Dueño Club X"
+            class="w-full bg-zinc-950 border border-zinc-800 focus:border-sky-500 focus:outline-none rounded-xl px-3.5 py-2.5 text-sm text-white"
+          />
+        </div>
+
+        <div>
+          <label for="userFormEmail" class="block text-xs font-bold text-zinc-300 mb-1">Correo electrónico</label>
+          <input
+            id="userFormEmail"
+            type="email"
+            required
+            placeholder="puerta1@boliche.com"
+            class="w-full bg-zinc-950 border border-zinc-800 focus:border-sky-500 focus:outline-none rounded-xl px-3.5 py-2.5 text-sm text-white disabled:opacity-50"
+          />
+        </div>
+
+        <div id="userPasswordRow">
+          <label for="userFormPassword" class="block text-xs font-bold text-zinc-300 mb-1">Contraseña inicial (mín. 6 caracteres)</label>
+          <input
+            id="userFormPassword"
+            type="password"
+            minlength="6"
+            placeholder="••••••••"
+            class="w-full bg-zinc-950 border border-zinc-800 focus:border-sky-500 focus:outline-none rounded-xl px-3.5 py-2.5 text-sm text-white"
+          />
+          <p class="text-[10px] text-zinc-500 mt-1">Tu sesión de Super Admin no se cerrará al crear la cuenta.</p>
+        </div>
+
+        <div>
+          <label for="userFormRole" class="block text-xs font-bold text-zinc-300 mb-1">Rol</label>
+          <select
+            id="userFormRole"
+            class="w-full bg-zinc-950 border border-zinc-800 focus:border-sky-500 focus:outline-none rounded-xl px-3 py-2.5 text-sm font-bold text-white"
+          >
+            <option value="operator">Operador (Puerta)</option>
+            <option value="owner">Admin de Boliche (Dueño)</option>
+          </select>
+        </div>
+
+        <!-- Asignación de boliche (1 para Operador, múltiples para Dueño) -->
+        <div>
+          <label id="userVenuesLabel" class="block text-xs font-bold text-zinc-300 mb-1.5">Boliche asignado</label>
+          <div id="userVenuesContainer" class="bg-zinc-950 border border-zinc-800 rounded-xl p-2.5 space-y-2 max-h-44 overflow-y-auto"></div>
+        </div>
+
+        <label class="no-select flex items-center justify-between bg-zinc-950 border border-zinc-800 rounded-xl px-3.5 py-2.5 cursor-pointer">
+          <span class="text-xs font-bold text-zinc-200">Cuenta activa</span>
+          <input id="userFormActive" type="checkbox" checked class="w-5 h-5 accent-indigo-500 rounded" />
+        </label>
+
+        <div class="flex gap-2 pt-2">
+          <button data-close="userModal" type="button" class="no-select flex-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-bold text-xs py-3 rounded-xl">
+            Cancelar
+          </button>
+          <button id="btnSaveUser" type="submit" class="no-select flex-1 bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold text-xs py-3 rounded-xl">
+            Guardar Usuario
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL: CONFIRMACIÓN PERSONALIZADA ==================== -->
+  <div id="confirmModal" class="hidden fixed inset-0 z-[70] bg-black/85 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-panel border border-zinc-800 rounded-2xl w-full max-w-sm p-5 shadow-2xl">
+      <h3 id="confirmModalTitle" class="text-base font-extrabold text-white">Confirmar acción</h3>
+      <p id="confirmModalMessage" class="text-xs text-zinc-400 mt-2 leading-relaxed"></p>
+      <div class="grid grid-cols-2 gap-2.5 mt-5">
+        <button id="btnConfirmCancel" type="button" class="no-select bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-bold text-xs py-2.5 rounded-xl">
+          Cancelar
+        </button>
+        <button id="btnConfirmOk" type="button" class="no-select bg-rose-600 hover:bg-rose-500 text-white font-extrabold text-xs py-2.5 rounded-xl">
+          Confirmar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL FULLSCREEN: REPORTE Y GRÁFICOS ==================== -->
+  <div id="reportModal" class="hidden fixed inset-0 z-50 bg-amoled flex flex-col overflow-y-auto">
+    <!-- Barra superior del Reporte -->
+    <header class="sticky top-0 z-20 bg-amoled/95 backdrop-blur-md border-b border-zinc-800/90 px-3.5 py-3">
+      <div class="max-w-3xl mx-auto flex items-center justify-between gap-2">
+        <button id="btnCloseReport" type="button" class="no-select flex items-center gap-1.5 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-200 text-xs font-bold px-3 py-2 rounded-xl">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+          </svg>
+          <span>Volver</span>
+        </button>
+
+        <div class="text-right min-w-0">
+          <h2 id="repTitle" class="text-sm font-black text-white truncate">Reporte de Boliche</h2>
+          <p id="repSubtitle" class="text-[11px] text-zinc-400 truncate">Cargando datos...</p>
+        </div>
+      </div>
+    </header>
+
+    <div class="max-w-3xl w-full mx-auto px-3.5 pt-4 pb-12 space-y-4">
+      <!-- Estado de carga del reporte -->
+      <div id="repLoading" class="py-16 text-center">
+        <div class="w-8 h-8 mx-auto border-2 border-sky-500 border-t-transparent rounded-full animate-spin"></div>
+        <p class="text-xs text-zinc-400 mt-3 font-semibold">Procesando registros de la noche...</p>
+      </div>
+
+      <!-- Cuerpo del reporte -->
+      <div id="repBody" class="hidden space-y-4">
+        <!-- Botones de Exportación -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+          <button
+            id="btnRepExportPng"
+            type="button"
+            class="no-select flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 active:scale-[0.98] transition text-white font-extrabold text-xs py-3 px-4 rounded-xl shadow-lg shadow-emerald-950/40"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M7.217 10.907a2.25 2.25 0 100 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186l9.566-5.314m-9.566 7.5l9.566 5.314m0 0a2.25 2.25 0 103.935 2.186 2.25 2.25 0 00-3.935-2.186zm0-12.814a2.25 2.25 0 103.933-2.185 2.25 2.25 0 00-3.933 2.185z" />
+            </svg>
+            <span>Compartir / Descargar PNG (WhatsApp)</span>
+          </button>
+
+          <button
+            id="btnRepExportExcel"
+            type="button"
+            class="no-select flex items-center justify-center gap-2 bg-sky-600/20 hover:bg-sky-600/30 active:scale-[0.98] transition text-sky-300 border border-sky-500/40 font-extrabold text-xs py-3 px-4 rounded-xl"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m.75 12l3 3m0 0l3-3m-3 3v-6m-1.5-9H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+            </svg>
+            <span>Exportar Excel (.xlsx)</span>
+          </button>
+        </div>
+
+        <!-- KPIs de Resumen -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+          <div class="bg-panel border border-zinc-800 rounded-2xl p-3">
+            <span class="text-[10px] uppercase tracking-wider font-bold text-zinc-400">Total Ingresos</span>
+            <p id="repKpiIn" class="text-2xl font-black text-white tabular-nums mt-0.5">0</p>
+            <p id="repKpiInSplit" class="text-[11px] font-semibold mt-0.5 tabular-nums"></p>
+          </div>
+          <div class="bg-panel border border-zinc-800 rounded-2xl p-3">
+            <span class="text-[10px] uppercase tracking-wider font-bold text-amber-400">Pico Ocupación</span>
+            <p id="repKpiPeak" class="text-2xl font-black text-white tabular-nums mt-0.5">0</p>
+            <p id="repKpiPeakTime" class="text-[11px] text-amber-300 font-semibold mt-0.5">Hora: --:--</p>
+          </div>
+          <div class="bg-panel border border-zinc-800 rounded-2xl p-3">
+            <span class="text-[10px] uppercase tracking-wider font-bold text-emerald-400">Adentro</span>
+            <p id="repKpiInside" class="text-2xl font-black text-white tabular-nums mt-0.5">0</p>
+            <p id="repKpiInsideSplit" class="text-[11px] text-zinc-400 font-semibold mt-0.5 tabular-nums">0 H · 0 M</p>
+          </div>
+          <div class="bg-panel border border-zinc-800 rounded-2xl p-3">
+            <span class="text-[10px] uppercase tracking-wider font-bold text-zinc-400">Total Salidas</span>
+            <p id="repKpiOut" class="text-2xl font-black text-white tabular-nums mt-0.5">0</p>
+            <p id="repKpiOutSplit" class="text-[11px] text-zinc-400 font-semibold mt-0.5 tabular-nums">0 H · 0 M</p>
+          </div>
+        </div>
+
+        <!-- Controles de Gráficos (Selector de Vista + Franja 15/30 min) -->
+        <div class="flex flex-wrap items-center justify-between gap-2 bg-panel border border-zinc-800 rounded-2xl p-2">
+          <div class="flex items-center gap-1 overflow-x-auto">
+            <button data-chart-tab="all" type="button" class="rep-chart-tab no-select px-2.5 py-1.5 rounded-xl text-[11px] font-bold bg-zinc-800 text-white">Todos</button>
+            <button data-chart-tab="occ" type="button" class="rep-chart-tab no-select px-2.5 py-1.5 rounded-xl text-[11px] font-bold text-zinc-400">Ocupación</button>
+            <button data-chart-tab="peaks" type="button" class="rep-chart-tab no-select px-2.5 py-1.5 rounded-xl text-[11px] font-bold text-zinc-400">Picos</button>
+            <button data-chart-tab="cum" type="button" class="rep-chart-tab no-select px-2.5 py-1.5 rounded-xl text-[11px] font-bold text-zinc-400">Acumulado</button>
+          </div>
+          <div class="flex items-center gap-1 bg-zinc-950 border border-zinc-800 rounded-xl p-0.5">
+            <button id="btnRepInt15" type="button" class="no-select px-2.5 py-1 rounded-lg text-[11px] font-bold bg-zinc-800 text-white">15m</button>
+            <button id="btnRepInt30" type="button" class="no-select px-2.5 py-1 rounded-lg text-[11px] font-bold text-zinc-400">30m</button>
+          </div>
+        </div>
+
+        <!-- Aviso si no hay eventos detallados -->
+        <div id="repNoEventsBox" class="hidden bg-panel border border-dashed border-zinc-700 rounded-2xl p-6 text-center">
+          <p class="text-sm font-bold text-zinc-200">Sin movimientos registrados todavía</p>
+          <p class="text-xs text-zinc-400 mt-1">Cuando los operadores empiecen a sumar ingresos en puerta, acá se dibujarán las curvas en tiempo real.</p>
+        </div>
+
+        <!-- Contenedor de los 3 Gráficos -->
+        <div id="repChartsWrapper" class="space-y-4">
+          <!-- Gráfico 1: Ocupación y Proporción -->
+          <div id="cardChartOcc" class="bg-panel border border-zinc-800 rounded-2xl p-3.5">
+            <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+              <div>
+                <h3 class="text-xs font-extrabold uppercase tracking-wider text-white">1. Ocupación y Proporción</h3>
+                <p class="text-[11px] text-zinc-400">Personas adentro en simultáneo a lo largo de la noche</p>
+              </div>
+              <label class="no-select flex items-center gap-1.5 text-[11px] font-semibold text-zinc-300 bg-zinc-900 border border-zinc-700 px-2.5 py-1 rounded-lg cursor-pointer">
+                <input id="repToggleTotalLine" type="checkbox" checked class="accent-amber-400 rounded" />
+                <span>Línea Total</span>
+              </label>
+            </div>
+            <div class="relative w-full h-64 sm:h-72">
+              <canvas id="repChartOcc"></canvas>
+            </div>
+          </div>
+
+          <!-- Gráfico 2: Picos de Ingreso -->
+          <div id="cardChartPeaks" class="bg-panel border border-zinc-800 rounded-2xl p-3.5">
+            <div class="mb-3">
+              <h3 class="text-xs font-extrabold uppercase tracking-wider text-white">2. Picos de Ingreso por Franja</h3>
+              <p id="repPeaksSubtitle" class="text-[11px] text-zinc-400">Ingresos por género cada 15 minutos</p>
+            </div>
+            <div class="relative w-full h-64 sm:h-72">
+              <canvas id="repChartPeaks"></canvas>
+            </div>
+          </div>
+
+          <!-- Gráfico 3: Ingresos Acumulados -->
+          <div id="cardChartCum" class="bg-panel border border-zinc-800 rounded-2xl p-3.5">
+            <div class="mb-3">
+              <h3 class="text-xs font-extrabold uppercase tracking-wider text-white">3. Ingresos Acumulados</h3>
+              <p class="text-[11px] text-zinc-400">Evolución total acumulada de Hombres vs Mujeres</p>
+            </div>
+            <div class="relative w-full h-60 sm:h-64">
+              <canvas id="repChartCum"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- Desglose por Puerta / Operador -->
+        <div class="bg-panel border border-zinc-800 rounded-2xl p-3.5">
+          <div class="mb-3">
+            <h3 class="text-xs font-extrabold uppercase tracking-wider text-white">Desglose por Puerta / Operador</h3>
+            <p class="text-[11px] text-zinc-400">Movimientos netos registrados por cada cuenta</p>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr class="border-b border-zinc-800 text-[10px] uppercase tracking-wider text-zinc-400">
+                  <th class="py-2 pr-2 font-bold">Operador</th>
+                  <th class="py-2 px-1.5 text-right font-bold text-sky-400">Ing. H</th>
+                  <th class="py-2 px-1.5 text-right font-bold text-pink-400">Ing. M</th>
+                  <th class="py-2 px-1.5 text-right font-bold text-emerald-400">Total Ing.</th>
+                  <th class="py-2 pl-1.5 text-right font-bold text-amber-400">Salidas</th>
+                </tr>
+              </thead>
+              <tbody id="repOperatorTableBody" class="divide-y divide-zinc-800/70 tabular-nums"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== TOASTS ==================== -->
+  <div id="toastContainer" class="fixed bottom-20 left-1/2 -translate-x-1/2 z-[80] pointer-events-none w-[92%] max-w-sm flex flex-col items-center gap-2"></div>
+
+  <!-- ==================== APLICACIÓN MODULAR FIREBASE v11.0.1 ==================== -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
+    import {
+      getAuth,
+      signInWithEmailAndPassword,
+      createUserWithEmailAndPassword,
+      signOut,
+      onAuthStateChanged,
+      sendPasswordResetEmail
+    } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
+    import {
+      getFirestore,
+      initializeFirestore,
+      persistentLocalCache,
+      persistentMultipleTabManager,
+      doc,
+      getDoc,
+      getDocs,
+      setDoc,
+      updateDoc,
+      deleteDoc,
+      collection,
+      query,
+      where,
+      onSnapshot,
+      writeBatch,
+      increment
+    } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+
+    // =========================================================================
+    // 1. CONFIGURACIÓN DE FIREBASE Y APP SECUNDARIA PARA ALTA DE USUARIOS
+    // =========================================================================
+    const firebaseConfig = {
+      apiKey: "AIzaSyAvnESJjQjMlfxFf2u7yzoggtS1f7rqKmY",
+      authDomain: "contador-boliche-leon.firebaseapp.com",
+      projectId: "contador-boliche-leon",
+      storageBucket: "contador-boliche-leon.firebasestorage.app",
+      messagingSenderId: "108055368417",
+      appId: "1:108055368417:web:2bd215a5c21709fb901da0"
+    };
+
+    const SUPER_ADMIN_EMAIL = "adminpuertas1@gmail.com";
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+
+    // Persistencia offline habilitada con fallback seguro
+    let db;
+    try {
+      db = initializeFirestore(app, {
+        localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
+      });
+    } catch (err) {
+      console.warn("Persistencia offline no disponible, usando memoria:", err);
+      db = getFirestore(app);
+    }
+
+    // Instancia secundaria para crear cuentas sin cerrar la sesión del Super Admin
+    const secondaryApp = initializeApp(firebaseConfig, "SecondaryAuth");
+    const secondaryAuth = getAuth(secondaryApp);
+
+    // =========================================================================
+    // 2. ESTADO GLOBAL DE LA APLICACIÓN
+    // =========================================================================
+    const state = {
+      authUser: null,
+      profile: null, // { email, name, role, venueIds, active }
+      venuesMap: new Map(), // venueId -> venueData
+      usersList: [], // Solo Super Admin
+      historyNights: [], // Noches archivadas cargadas
+      activeTab: "live", // live | venues | users | history
+      unsubscribers: [], // Limpieza al cerrar sesión
+      operatorClockInterval: null,
+      dashboardClockInterval: null,
+      sessionModalVenueId: null,
+      reportContext: null, // { mode: 'live'|'archived', venueName, dateLabel, closeTime, intervalMin, stats, events, startedAt, closedAt }
+      reportChartTab: "all",
+      reportShowTotal: true,
+      charts: { occ: null, peaks: null, cum: null },
+      isOnline: navigator.onLine,
+      opHasPendingWrites: false,
+      opFromCache: false,
+    };
+
+    // =========================================================================
+    // 3. UTILIDADES GENERALES
+    // =========================================================================
+    function escapeHtml(str) {
+      return String(str ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    }
+
+    function vibrate(pattern = 20) {
+      try {
+        if (navigator.vibrate) navigator.vibrate(pattern);
+      } catch (_) {}
+    }
+
+    function showToast(msg, type = "info") {
+      const container = document.getElementById("toastContainer");
+      const el = document.createElement("div");
+      const palette = {
+        info: "bg-zinc-900/95 border-zinc-700 text-zinc-100",
+        success: "bg-emerald-950/95 border-emerald-500/60 text-emerald-200",
+        warn: "bg-amber-950/95 border-amber-500/60 text-amber-200",
+        error: "bg-rose-950/95 border-rose-500/60 text-rose-200",
+      };
+      el.className = `pointer-events-auto px-4 py-2.5 rounded-xl border text-xs font-bold shadow-2xl backdrop-blur-md transition-all duration-300 opacity-0 translate-y-2 text-center ${palette[type] || palette.info}`;
+      el.textContent = msg;
+      container.appendChild(el);
+      requestAnimationFrame(() => el.classList.remove("opacity-0", "translate-y-2"));
+      setTimeout(() => {
+        el.classList.add("opacity-0", "translate-y-2");
+        setTimeout(() => el.remove(), 300);
+      }, 3000);
+    }
+
+    function formatTimeHHMM(ts) {
+      const d = new Date(ts);
+      return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+    }
+
+    function formatDateYYYYMMDD(d = new Date()) {
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    }
+
+    function formatDatePretty(dateStr) {
+      if (!dateStr) return "--";
+      const parts = dateStr.split("-");
+      if (parts.length !== 3) return dateStr;
+      return `${parts[2]}/${parts[1]}/${parts[0]}`;
+    }
+
+    // Calcula el próximo timestamp de cierre a partir de sessionStartedAt y closeTime ("HH:MM")
+    function computeAutoCloseAt(startedAtMs, closeTimeStr = "05:00") {
+      const [hhRaw, mmRaw] = String(closeTimeStr || "05:00").split(":");
+      const hh = Number.isFinite(Number(hhRaw)) ? Number(hhRaw) : 5;
+      const mm = Number.isFinite(Number(mmRaw)) ? Number(mmRaw) : 0;
+      const d = new Date(startedAtMs);
+      d.setHours(hh, mm, 0, 0);
+      if (d.getTime() <= startedAtMs) {
+        d.setDate(d.getDate() + 1);
+      }
+      return d.getTime();
+    }
+
+    function generateSessionId(dateLabel) {
+      const rand = Math.random().toString(36).slice(2, 7);
+      return `noche_${dateLabel}_${Date.now().toString(36)}_${rand}`;
+    }
+
+    function generateVenueId(name) {
+      const slug = String(name || "boliche")
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "")
+        .slice(0, 20);
+      const rand = Math.random().toString(36).slice(2, 6);
+      return `${slug || "local"}-${rand}`;
+    }
+
+    function normalizeStats(stats) {
+      const inM = Math.max(0, Number(stats?.inM) || 0);
+      const inF = Math.max(0, Number(stats?.inF) || 0);
+      const outM = Math.max(0, Number(stats?.outM) || 0);
+      const outF = Math.max(0, Number(stats?.outF) || 0);
+      const insideM = Math.max(0, inM - outM);
+      const insideF = Math.max(0, inF - outF);
+      const totalIn = inM + inF;
+      const totalOut = outM + outF;
+      const insideTotal = insideM + insideF;
+      const pctInsideM = insideTotal > 0 ? Math.round((insideM / insideTotal) * 100) : 0;
+      const pctInsideF = insideTotal > 0 ? 100 - pctInsideM : 0;
+      const pctInM = totalIn > 0 ? Math.round((inM / totalIn) * 100) : 0;
+      const pctInF = totalIn > 0 ? 100 - pctInM : 0;
+      return { inM, inF, outM, outF, insideM, insideF, totalIn, totalOut, insideTotal, pctInsideM, pctInsideF, pctInM, pctInF };
+    }
+
+    function getVenueStatus(venue) {
+      if (!venue.active) {
+        return { locked: true, code: "paused", label: "Pausado", badgeClass: "bg-zinc-800 text-zinc-400 border-zinc-700", reason: "Local pausado por administración" };
+      }
+      if (!venue.sessionActive) {
+        return { locked: true, code: "closed", label: "Cerrado", badgeClass: "bg-rose-500/15 text-rose-300 border-rose-500/40", reason: "Sesión cerrada por administración" };
+      }
+      if (venue.sessionAutoCloseAt && Date.now() >= venue.sessionAutoCloseAt) {
+        return { locked: true, code: "autoclosed", label: `Cierre auto ${venue.closeTime || "05:00"}`, badgeClass: "bg-amber-500/15 text-amber-300 border-amber-500/40", reason: `Cierre automático ${venue.closeTime || "05:00"} hs` };
+      }
+      return { locked: false, code: "open", label: "Abierto", badgeClass: "bg-emerald-500/15 text-emerald-300 border-emerald-500/40", reason: "" };
+    }
+
+    // Modal de confirmación reutilizable (sin usar alert/confirm nativos)
+    let confirmCallback = null;
+    function showConfirmModal(title, message, okLabel = "Confirmar", okClass = "bg-rose-600 hover:bg-rose-500") {
+      return new Promise((resolve) => {
+        document.getElementById("confirmModalTitle").textContent = title;
+        document.getElementById("confirmModalMessage").textContent = message;
+        const okBtn = document.getElementById("btnConfirmOk");
+        okBtn.textContent = okLabel;
+        okBtn.className = `no-select text-white font-extrabold text-xs py-2.5 rounded-xl ${okClass}`;
+        confirmCallback = resolve;
+        document.getElementById("confirmModal").classList.remove("hidden");
+      });
+    }
+
+    function closeConfirmModal(result) {
+      document.getElementById("confirmModal").classList.add("hidden");
+      if (confirmCallback) {
+        const fn = confirmCallback;
+        confirmCallback = null;
+        fn(result);
+      }
+    }
+
+    function clearAllListeners() {
+      state.unsubscribers.forEach((u) => {
+        try { u(); } catch (_) {}
+      });
+      state.unsubscribers = [];
+      if (state.operatorClockInterval) {
+        clearInterval(state.operatorClockInterval);
+        state.operatorClockInterval = null;
+      }
+      if (state.dashboardClockInterval) {
+        clearInterval(state.dashboardClockInterval);
+        state.dashboardClockInterval = null;
+      }
+      state.venuesMap.clear();
+      state.usersList = [];
+      state.historyNights = [];
+    }
+
+    function showScreen(screenId) {
+      ["splashScreen", "loginView", "operatorView", "dashboardView"].forEach((id) => {
+        const el = document.getElementById(id);
+        if (id === screenId) el.classList.remove("hidden");
+        else el.classList.add("hidden");
+      });
+    }
+
+    // =========================================================================
+    // 4. AUTENTICACIÓN Y RUTEO POR ROL
+    // =========================================================================
+    function translateAuthError(code) {
+      const map = {
+        "auth/invalid-credential": "Correo o contraseña incorrectos.",
+        "auth/wrong-password": "Contraseña incorrecta.",
+        "auth/user-not-found": "No existe una cuenta registrada con ese correo.",
+        "auth/invalid-email": "Ingresá un correo electrónico válido.",
+        "auth/user-disabled": "Esta cuenta fue deshabilitada por el administrador.",
+        "auth/too-many-requests": "Demasiados intentos fallidos. Esperá unos minutos y volvé a intentar.",
+        "auth/network-request-failed": "Sin conexión a internet. Revisá tu señal e intentá nuevamente.",
+      };
+      return map[code] || "No se pudo iniciar sesión. Verificá tus datos e intentá nuevamente.";
+    }
+
+    function showLoginError(message) {
+      const box = document.getElementById("loginErrorBox");
+      if (!message) {
+        box.classList.add("hidden");
+        box.textContent = "";
+      } else {
+        box.textContent = message;
+        box.classList.remove("hidden");
+      }
+    }
+
+    async function handleAuthUser(user) {
+      clearAllListeners();
+      document.getElementById("reportModal").classList.add("hidden");
+
+      if (!user) {
+        state.authUser = null;
+        state.profile = null;
+        showScreen("loginView");
+        return;
+      }
+
+      state.authUser = user;
+      const emailLower = (user.email || "").trim().toLowerCase();
+
+      // Super Admin hardcoded
+      if (emailLower === SUPER_ADMIN_EMAIL.toLowerCase()) {
+        state.profile = {
+          email: emailLower,
+          name: "Super Admin",
+          role: "superadmin",
+          venueIds: [],
+          active: true,
+        };
+        initSuperAdminDashboard();
+        return;
+      }
+
+      // Otros roles: validar documento users/{emailLower}
+      try {
+        const userRef = doc(db, "users", emailLower);
+        const snap = await getDoc(userRef);
+        if (!snap.exists() || snap.data().active !== true) {
+          await signOut(auth);
+          showLoginError("Tu cuenta no tiene permisos activos. Contactá al administrador.");
+          showScreen("loginView");
+          return;
+        }
+
+        const data = snap.data();
+        state.profile = {
+          email: emailLower,
+          name: data.name || emailLower.split("@")[0],
+          role: data.role,
+          venueIds: Array.isArray(data.venueIds) ? data.venueIds : [],
+          active: true,
+        };
+
+        // Escucha en tiempo real de su propio perfil por si el Super Admin suspende la cuenta en vivo
+        const unsubSelf = onSnapshot(userRef, async (liveSnap) => {
+          if (!liveSnap.exists() || liveSnap.data().active !== true) {
+            showToast("Tu cuenta fue suspendida por administración", "error");
+            await signOut(auth);
+            return;
+          }
+          const updated = liveSnap.data();
+          const prevVenues = JSON.stringify(state.profile.venueIds);
+          const nextVenues = JSON.stringify(Array.isArray(updated.venueIds) ? updated.venueIds : []);
+          const roleChanged = updated.role !== state.profile.role;
+          state.profile.name = updated.name || state.profile.name;
+          if (roleChanged || prevVenues !== nextVenues) {
+            handleAuthUser(auth.currentUser);
+          }
+        }, (err) => {
+          console.warn("Error escuchando perfil propio:", err);
+        });
+        state.unsubscribers.push(unsubSelf);
+
+        if (state.profile.role === "operator") {
+          initOperatorView();
+        } else if (state.profile.role === "owner") {
+          initOwnerDashboard();
+        } else {
+          await signOut(auth);
+          showLoginError("Tu cuenta no tiene permisos activos. Contactá al administrador.");
+          showScreen("loginView");
+        }
+      } catch (err) {
+        console.error("Error validando perfil de usuario:", err);
+        await signOut(auth);
+        showLoginError("Error al verificar tus permisos. Revisá la conexión o las reglas de Firestore.");
+        showScreen("loginView");
+      }
+    }
+
+    // =========================================================================
+    // 5. VISTA OPERADOR (PUERTA) — SIN ACCESO A REPORTES NI OTROS LOCALES
+    // =========================================================================
+    function updateOperatorConnectionUI() {
+      const dot = document.getElementById("opConnDot");
+      const txt = document.getElementById("opConnText");
+      if (!state.isOnline) {
+        dot.className = "w-2 h-2 rounded-full bg-amber-400 animate-pulse shrink-0";
+        txt.textContent = "Sin señal · guardando local";
+      } else if (state.opHasPendingWrites) {
+        dot.className = "w-2 h-2 rounded-full bg-sky-400 animate-pulse shrink-0";
+        txt.textContent = "Sincronizando...";
+      } else {
+        dot.className = "w-2 h-2 rounded-full bg-emerald-400 shrink-0";
+        txt.textContent = "En línea";
+      }
+    }
+
+    function initOperatorView() {
+      showScreen("operatorView");
+      document.getElementById("opUserBadge").textContent = state.profile.name;
+      updateOperatorConnectionUI();
+
+      const assignedVenueId = state.profile.venueIds[0];
+      if (!assignedVenueId) {
+        document.getElementById("opVenueName").textContent = "Sin boliche";
+        document.getElementById("opNoVenueCard").classList.remove("hidden");
+        document.getElementById("opMainContainer").classList.add("hidden");
+        return;
+      }
+
+      document.getElementById("opNoVenueCard").classList.add("hidden");
+      document.getElementById("opMainContainer").classList.remove("hidden");
+
+      // IMPORTANTE: Operador escucha únicamente su documento individual venues/{vid}
+      const venueRef = doc(db, "venues", assignedVenueId);
+      const unsubVenue = onSnapshot(
+        venueRef,
+        { includeMetadataChanges: true },
+        (snap) => {
+          state.opHasPendingWrites = snap.metadata.hasPendingWrites;
+          state.opFromCache = snap.metadata.fromCache;
+          updateOperatorConnectionUI();
+
+          if (!snap.exists()) {
+            document.getElementById("opVenueName").textContent = "Boliche no encontrado";
+            document.getElementById("opNoVenueCard").classList.remove("hidden");
+            document.getElementById("opMainContainer").classList.add("hidden");
+            return;
+          }
+
+          document.getElementById("opNoVenueCard").classList.add("hidden");
+          document.getElementById("opMainContainer").classList.remove("hidden");
+          state.venuesMap.set(assignedVenueId, { id: assignedVenueId, ...snap.data() });
+          renderOperatorUI();
+        },
+        (err) => {
+          console.error("Error escuchando boliche de operador:", err);
+          showToast("Error de conexión con el boliche", "error");
+        }
+      );
+      state.unsubscribers.push(unsubVenue);
+
+      // Reloj y chequeo de cierre automático cada 10 segundos
+      const updateOpClock = () => {
+        document.getElementById("opLiveClock").textContent = formatTimeHHMM(Date.now());
+        renderOperatorUI();
+      };
+      updateOpClock();
+      state.operatorClockInterval = setInterval(updateOpClock, 10000);
+    }
+
+    function renderOperatorUI() {
+      const vid = state.profile?.venueIds?.[0];
+      const venue = vid ? state.venuesMap.get(vid) : null;
+      if (!venue) return;
+
+      const s = normalizeStats(venue.stats);
+      const status = getVenueStatus(venue);
+
+      document.getElementById("opVenueName").textContent = venue.name || "Boliche";
+      document.getElementById("opCloseBadge").textContent = `Cierre ${venue.closeTime || "05:00"}`;
+      document.getElementById("opStatIn").textContent = s.totalIn;
+      document.getElementById("opStatInside").textContent = s.insideTotal;
+      document.getElementById("opStatOut").textContent = s.totalOut;
+
+      document.getElementById("opInsideM").textContent = s.insideM;
+      document.getElementById("opInsideF").textContent = s.insideF;
+      document.getElementById("opPctM").textContent = `(${s.pctInsideM}%)`;
+      document.getElementById("opPctF").textContent = `(${s.pctInsideF}%)`;
+
+      const barM = document.getElementById("opBarM");
+      const barF = document.getElementById("opBarF");
+      if (s.insideTotal === 0) {
+        barM.style.width = "50%";
+        barF.style.width = "50%";
+      } else {
+        barM.style.width = `${s.pctInsideM}%`;
+        barF.style.width = `${s.pctInsideF}%`;
+      }
+
+      document.getElementById("opCountInM").textContent = s.inM;
+      document.getElementById("opCountInF").textContent = s.inF;
+      document.getElementById("opCountOutM").textContent = s.outM;
+      document.getElementById("opCountOutF").textContent = s.outF;
+
+      document.getElementById("opSessionInfo").textContent = `Noche ${formatDatePretty(venue.sessionDateLabel)}`;
+
+      // Bloqueo por cierre automático o pausa
+      const lockedCard = document.getElementById("opLockedCard");
+      const buttonsArea = document.getElementById("opButtonsArea");
+      if (status.locked) {
+        lockedCard.classList.remove("hidden");
+        buttonsArea.classList.add("hidden");
+        document.getElementById("opLockedReason").textContent = status.reason;
+      } else {
+        lockedCard.classList.add("hidden");
+        buttonsArea.classList.remove("hidden");
+      }
+    }
+
+    // Registro atómico con writeBatch (cumple estrictamente las reglas de seguridad)
+    async function operatorTap(type, gender, delta, btnEl = null) {
+      const vid = state.profile?.venueIds?.[0];
+      const venue = vid ? state.venuesMap.get(vid) : null;
+      if (!venue) return;
+
+      const status = getVenueStatus(venue);
+      if (status.locked) {
+        vibrate([30, 30]);
+        renderOperatorUI();
+        showToast(status.reason, "warn");
+        return;
+      }
+
+      const s = normalizeStats(venue.stats);
+      const field = `${type}${gender}`; // inM, inF, outM, outF
+
+      // Validaciones para evitar negativos
+      if (delta === -1) {
+        if (s[field] <= 0) {
+          vibrate(25);
+          showToast("El contador ya está en 0", "warn");
+          return;
+        }
+        if (type === "in" && gender === "M" && s.insideM <= 0) {
+          vibrate(25);
+          showToast("No podés restar ingreso: hay 0 hombres adentro", "warn");
+          return;
+        }
+        if (type === "in" && gender === "F" && s.insideF <= 0) {
+          vibrate(25);
+          showToast("No podés restar ingreso: hay 0 mujeres adentro", "warn");
+          return;
+        }
+      } else if (delta === 1 && type === "out") {
+        if (gender === "M" && s.insideM <= 0) {
+          vibrate(25);
+          showToast("No hay hombres adentro para registrar salida", "warn");
+          return;
+        }
+        if (gender === "F" && s.insideF <= 0) {
+          vibrate(25);
+          showToast("No hay mujeres adentro para registrar salida", "warn");
+          return;
+        }
+      }
+
+      // Feedback táctil y visual inmediato
+      vibrate(delta > 0 ? 18 : 28);
+      if (btnEl) {
+        btnEl.classList.remove("tap-pop");
+        void btnEl.offsetWidth;
+        btnEl.classList.add("tap-pop");
+      }
+
+      const now = Date.now();
+      const labelTxt = `${type === "in" ? "Ingreso" : "Salida"} ${gender === "M" ? "Hombre" : "Mujer"} (${delta > 0 ? "+1" : "-1"}) · ${formatTimeHHMM(now)}`;
+      document.getElementById("opLastAction").textContent = labelTxt;
+
+      try {
+        const batch = writeBatch(db);
+        const venueRef = doc(db, "venues", venue.id);
+        const eventRef = doc(collection(db, "venues", venue.id, "events"));
+
+        // ÚNICAMENTE las claves 'stats' y 'updatedAt' para cumplir las reglas de seguridad
+        batch.update(venueRef, {
+          [`stats.${field}`]: increment(delta),
+          updatedAt: now,
+        });
+
+        batch.set(eventRef, {
+          sessionId: venue.sessionId || "default",
+          ts: now,
+          type,
+          gender,
+          delta,
+          operatorEmail: state.profile.email,
+          operatorName: state.profile.name,
+        });
+
+        await batch.commit();
+      } catch (err) {
+        console.error("Error registrando toque:", err);
+        showToast("Error al registrar el movimiento. Revisá permisos.", "error");
+      }
+    }
+
+    // =========================================================================
+    // 6. PANELES DE SUPER ADMIN Y PROPIETARIO
+    // =========================================================================
+    function setupDashboardChrome(isSuperAdmin) {
+      showScreen("dashboardView");
+
+      const roleBadge = document.getElementById("dashRoleBadge");
+      const title = document.getElementById("dashTitle");
+      const subtitle = document.getElementById("dashSubtitle");
+      const navGrid = document.getElementById("dashNavGrid");
+      const navVenues = document.getElementById("navBtnVenues");
+      const navUsers = document.getElementById("navBtnUsers");
+
+      if (isSuperAdmin) {
+        roleBadge.textContent = "Super Admin";
+        roleBadge.className = "px-2 py-0.5 rounded-md text-[10px] font-extrabold uppercase tracking-wider bg-indigo-500/20 text-indigo-300 border border-indigo-500/30";
+        title.textContent = "Panel Super Admin";
+        subtitle.textContent = state.profile.email;
+        navGrid.className = "max-w-lg mx-auto grid grid-cols-4 gap-1";
+        navVenues.classList.remove("hidden");
+        navUsers.classList.remove("hidden");
+      } else {
+        roleBadge.textContent = "Propietario";
+        roleBadge.className = "px-2 py-0.5 rounded-md text-[10px] font-extrabold uppercase tracking-wider bg-pink-500/20 text-pink-300 border border-pink-500/30";
+        title.textContent = "Panel Propietario";
+        subtitle.textContent = `${state.profile.name} · ${state.profile.email}`;
+        navGrid.className = "max-w-lg mx-auto grid grid-cols-2 gap-2";
+        navVenues.classList.add("hidden");
+        navUsers.classList.add("hidden");
+      }
+
+      switchDashboardTab("live");
+
+      const tickClock = () => {
+        document.getElementById("dashClock").textContent = formatTimeHHMM(Date.now());
+        if (state.activeTab === "live") renderLiveVenuesGrid();
+      };
+      tickClock();
+      state.dashboardClockInterval = setInterval(tickClock, 15000);
+    }
+
+    function initSuperAdminDashboard() {
+      setupDashboardChrome(true);
+
+      // Escuchar TODOS los boliches en tiempo real
+      const unsubVenues = onSnapshot(
+        collection(db, "venues"),
+        (snap) => {
+          state.venuesMap.clear();
+          snap.forEach((d) => state.venuesMap.set(d.id, { id: d.id, ...d.data() }));
+          renderLiveVenuesGrid();
+          renderVenuesManageList();
+          populateHistoryVenueFilter();
+        },
+        (err) => {
+          console.error("Error leyendo boliches:", err);
+          showToast("Error leyendo boliches. Verificá las reglas de Firestore.", "error");
+        }
+      );
+      state.unsubscribers.push(unsubVenues);
+
+      // Escuchar TODOS los usuarios en tiempo real
+      const unsubUsers = onSnapshot(
+        collection(db, "users"),
+        (snap) => {
+          const list = [];
+          snap.forEach((d) => list.push({ id: d.id, ...d.data() }));
+          list.sort((a, b) => (a.name || a.email).localeCompare(b.name || b.email));
+          state.usersList = list;
+          renderUsersManageList();
+        },
+        (err) => {
+          console.error("Error leyendo usuarios:", err);
+        }
+      );
+      state.unsubscribers.push(unsubUsers);
+    }
+
+    function initOwnerDashboard() {
+      setupDashboardChrome(false);
+
+      const assignedIds = state.profile.venueIds || [];
+      if (assignedIds.length === 0) {
+        renderLiveVenuesGrid();
+        populateHistoryVenueFilter();
+        return;
+      }
+
+      // IMPORTANTE: Propietario NUNCA consulta collection("venues"), sino cada doc individualmente
+      assignedIds.forEach((vid) => {
+        const unsub = onSnapshot(
+          doc(db, "venues", vid),
+          (snap) => {
+            if (snap.exists()) {
+              state.venuesMap.set(vid, { id: vid, ...snap.data() });
+            } else {
+              state.venuesMap.delete(vid);
+            }
+            renderLiveVenuesGrid();
+            populateHistoryVenueFilter();
+          },
+          (err) => {
+            console.error(`Error leyendo boliche ${vid}:`, err);
+          }
+        );
+        state.unsubscribers.push(unsub);
+      });
+    }
+
+    function switchDashboardTab(tab) {
+      const isSuperAdmin = state.profile?.role === "superadmin";
+      if (!isSuperAdmin && (tab === "venues" || tab === "users")) return;
+
+      state.activeTab = tab;
+      ["live", "venues", "users", "history"].forEach((t) => {
+        const panel = document.getElementById(`tab${t.charAt(0).toUpperCase() + t.slice(1)}`);
+        if (panel) panel.classList.toggle("hidden", t !== tab);
+      });
+
+      document.querySelectorAll(".dash-nav-btn").forEach((btn) => {
+        const active = btn.dataset.tab === tab;
+        btn.className = `dash-nav-btn no-select flex flex-col items-center justify-center py-1.5 rounded-xl transition ${
+          active ? "text-sky-400 bg-sky-500/10" : "text-zinc-400 hover:text-zinc-200"
+        }`;
+      });
+
+      if (tab === "history") {
+        loadHistoryNights();
+      }
+    }
+
+    function getSortedVenues() {
+      return Array.from(state.venuesMap.values()).sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+    }
+
+    // ---- RENDER TAB: EN VIVO ----
+    function renderLiveVenuesGrid() {
+      const grid = document.getElementById("liveVenuesGrid");
+      const venues = getSortedVenues();
+      const isSuperAdmin = state.profile?.role === "superadmin";
+
+      let totalInsideAll = 0;
+      let totalInAll = 0;
+      venues.forEach((v) => {
+        const s = normalizeStats(v.stats);
+        totalInsideAll += s.insideTotal;
+        totalInAll += s.totalIn;
+      });
+
+      document.getElementById("liveSummaryVenues").textContent = venues.length;
+      document.getElementById("liveSummaryInside").textContent = totalInsideAll;
+      document.getElementById("liveSummaryIn").textContent = totalInAll;
+
+      if (venues.length === 0) {
+        grid.innerHTML = `
+          <div class="col-span-full bg-panel border border-dashed border-zinc-800 rounded-2xl p-8 text-center">
+            <p class="text-sm font-extrabold text-zinc-200">${isSuperAdmin ? "Todavía no creaste ningún boliche" : "No tenés boliches asignados todavía"}</p>
+            <p class="text-xs text-zinc-400 mt-1">${isSuperAdmin ? "Tocá en la pestaña Boliches para dar de alta tu primer local." : "Contactá al Super Admin para que vincule tu cuenta a tu boliche."}</p>
+            ${isSuperAdmin ? `<button id="btnEmptyCreateVenue" type="button" class="no-select mt-4 bg-sky-600 hover:bg-sky-500 text-white text-xs font-extrabold px-4 py-2.5 rounded-xl">+ Crear primer boliche</button>` : ""}
+          </div>
+        `;
+        const btnEmpty = document.getElementById("btnEmptyCreateVenue");
+        if (btnEmpty) btnEmpty.addEventListener("click", () => openVenueModal(null));
+        return;
+      }
+
+      grid.innerHTML = venues.map((v) => {
+        const s = normalizeStats(v.stats);
+        const st = getVenueStatus(v);
+        const barW_M = s.insideTotal === 0 ? 50 : s.pctInsideM;
+        const barW_F = s.insideTotal === 0 ? 50 : s.pctInsideF;
+
+        return `
+          <article class="bg-panel border border-zinc-800/90 rounded-2xl p-4 shadow-lg shadow-black/30 flex flex-col gap-3">
+            <!-- Encabezado de tarjeta -->
+            <div class="flex items-start justify-between gap-2">
+              <div class="min-w-0">
+                <h3 class="text-base font-black text-white truncate">${escapeHtml(v.name)}</h3>
+                <p class="text-[11px] text-zinc-500 mt-0.5 tabular-nums">
+                  Noche ${formatDatePretty(v.sessionDateLabel)} · Cierre ${escapeHtml(v.closeTime || "05:00")} hs
+                </p>
+              </div>
+              <span class="px-2.5 py-1 rounded-full text-[10px] font-extrabold border shrink-0 ${st.badgeClass}">
+                ${escapeHtml(st.label)}
+              </span>
+            </div>
+
+            <!-- 3 KPIs principales (solo lectura) -->
+            <div class="grid grid-cols-3 gap-2 text-center">
+              <div class="bg-zinc-900/90 border border-zinc-800 rounded-xl py-2 px-1.5">
+                <span class="text-[10px] uppercase font-bold text-emerald-400/90 block">Ingresos</span>
+                <span class="text-xl font-extrabold text-zinc-100 tabular-nums">${s.totalIn}</span>
+              </div>
+              <div class="bg-gradient-to-b from-zinc-800/80 to-zinc-900 border border-zinc-600/50 rounded-xl py-2 px-1.5">
+                <span class="text-[10px] uppercase font-extrabold text-white block">Adentro</span>
+                <span class="text-2xl font-black text-white tabular-nums">${s.insideTotal}</span>
+              </div>
+              <div class="bg-zinc-900/90 border border-zinc-800 rounded-xl py-2 px-1.5">
+                <span class="text-[10px] uppercase font-bold text-amber-400/90 block">Salidas</span>
+                <span class="text-xl font-extrabold text-zinc-100 tabular-nums">${s.totalOut}</span>
+              </div>
+            </div>
+
+            <!-- Barra de proporción en vivo -->
+            <div>
+              <div class="flex items-center justify-between text-[11px] font-bold mb-1 tabular-nums">
+                <span class="text-sky-400">Hombres: ${s.insideM} (${s.pctInsideM}%)</span>
+                <span class="text-pink-400">Mujeres: ${s.insideF} (${s.pctInsideF}%)</span>
+              </div>
+              <div class="w-full h-2 bg-zinc-800 rounded-full overflow-hidden flex">
+                <div class="h-full bg-sky-400 transition-all duration-300" style="width: ${barW_M}%"></div>
+                <div class="h-full bg-pink-500 transition-all duration-300" style="width: ${barW_F}%"></div>
+              </div>
+            </div>
+
+            <!-- Botones de acción según rol (sin botones de conteo +1/-1) -->
+            ${isSuperAdmin ? `
+              <div class="grid grid-cols-3 gap-1.5 pt-1 border-t border-zinc-800/80">
+                <button data-action="report" data-vid="${escapeHtml(v.id)}" type="button" class="live-card-btn no-select bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/40 text-indigo-300 text-[11px] font-extrabold py-2 px-2 rounded-xl transition">
+                  Ver Reporte
+                </button>
+                <button data-action="config" data-vid="${escapeHtml(v.id)}" type="button" class="live-card-btn no-select bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-200 text-[11px] font-bold py-2 px-2 rounded-xl transition">
+                  Configurar
+                </button>
+                <button data-action="session" data-vid="${escapeHtml(v.id)}" type="button" class="live-card-btn no-select bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/40 text-amber-300 text-[11px] font-bold py-2 px-2 rounded-xl transition">
+                  Noche
+                </button>
+              </div>
+            ` : `
+              <div class="pt-1 border-t border-zinc-800/80">
+                <button data-action="report" data-vid="${escapeHtml(v.id)}" type="button" class="live-card-btn no-select w-full bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/40 text-indigo-200 text-xs font-extrabold py-2.5 px-3 rounded-xl transition">
+                  Ver Reporte y Gráficos
+                </button>
+              </div>
+            `}
+          </article>
+        `;
+      }).join("");
+
+      grid.querySelectorAll(".live-card-btn").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const vid = btn.dataset.vid;
+          const action = btn.dataset.action;
+          const venue = state.venuesMap.get(vid);
+          if (!venue) return;
+          if (action === "report") openLiveReport(venue);
+          else if (action === "config") openVenueModal(venue);
+          else if (action === "session") openSessionModal(venue);
+        });
+      });
+    }
+
+    // ---- RENDER TAB: GESTIÓN DE BOLICHES (SUPER ADMIN) ----
+    function renderVenuesManageList() {
+      const container = document.getElementById("venuesManageList");
+      const venues = getSortedVenues();
+
+      if (venues.length === 0) {
+        container.innerHTML = `
+          <div class="bg-panel border border-dashed border-zinc-800 rounded-2xl p-6 text-center text-xs text-zinc-400">
+            No hay boliches registrados todavía. Tocá <strong>+ Nuevo Boliche</strong> para empezar.
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = venues.map((v) => {
+        const s = normalizeStats(v.stats);
+        const st = getVenueStatus(v);
+        return `
+          <div class="bg-panel border border-zinc-800 rounded-2xl p-4 space-y-3">
+            <div class="flex items-start justify-between gap-2">
+              <div class="min-w-0">
+                <div class="flex items-center gap-2">
+                  <h3 class="text-sm font-black text-white truncate">${escapeHtml(v.name)}</h3>
+                  <span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold border ${st.badgeClass}">${escapeHtml(st.label)}</span>
+                </div>
+                <p class="text-[11px] text-zinc-400 mt-1 tabular-nums">
+                  Cierre: <strong>${escapeHtml(v.closeTime || "05:00")} hs</strong> · Franjas: <strong>${v.intervalMin || 15} min</strong> · Noche actual: <strong>${s.totalIn} ing.</strong>
+                </p>
+              </div>
+              <button data-vact="toggle" data-vid="${escapeHtml(v.id)}" type="button" class="vm-btn no-select px-2.5 py-1.5 rounded-xl text-[11px] font-bold border ${v.active ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-300" : "bg-zinc-900 border-zinc-700 text-zinc-400"}">
+                ${v.active ? "Activo" : "Pausado"}
+              </button>
+            </div>
+
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-zinc-800/80">
+              <button data-vact="edit" data-vid="${escapeHtml(v.id)}" type="button" class="vm-btn no-select bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-200 text-xs font-bold py-2 rounded-xl">
+                Editar Config
+              </button>
+              <button data-vact="archive" data-vid="${escapeHtml(v.id)}" type="button" class="vm-btn no-select bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/40 text-amber-300 text-xs font-bold py-2 rounded-xl">
+                Cerrar y Archivar
+              </button>
+              <button data-vact="newnight" data-vid="${escapeHtml(v.id)}" type="button" class="vm-btn no-select bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/40 text-emerald-300 text-xs font-bold py-2 rounded-xl">
+                Nueva Noche
+              </button>
+              <button data-vact="delete" data-vid="${escapeHtml(v.id)}" type="button" class="vm-btn no-select bg-rose-600/15 hover:bg-rose-600/25 border border-rose-500/40 text-rose-300 text-xs font-bold py-2 rounded-xl">
+                Eliminar
+              </button>
+            </div>
+          </div>
+        `;
+      }).join("");
+
+      container.querySelectorAll(".vm-btn").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+          const vid = btn.dataset.vid;
+          const act = btn.dataset.vact;
+          const venue = state.venuesMap.get(vid);
+          if (!venue) return;
+
+          if (act === "edit") {
+            openVenueModal(venue);
+          } else if (act === "toggle") {
+            await updateDoc(doc(db, "venues", vid), { active: !venue.active, updatedAt: Date.now() });
+            showToast(venue.active ? `${venue.name} pausado` : `${venue.name} activado`, "info");
+          } else if (act === "archive" || act === "newnight") {
+            openSessionModal(venue);
+          } else if (act === "delete") {
+            const ok = await showConfirmModal(
+              "Eliminar boliche",
+              `¿Seguro que querés eliminar "${venue.name}"? Esta acción quita el local del sistema.`,
+              "Sí, eliminar"
+            );
+            if (!ok) return;
+            try {
+              await deleteDoc(doc(db, "venues", vid));
+              showToast(`Boliche "${venue.name}" eliminado`, "success");
+            } catch (err) {
+              console.error(err);
+              showToast("No se pudo eliminar el boliche", "error");
+            }
+          }
+        });
+      });
+    }
+
+    function openVenueModal(venue) {
+      document.getElementById("venueModalTitle").textContent = venue ? "Configurar Boliche" : "Nuevo Boliche";
+      document.getElementById("venueFormId").value = venue ? venue.id : "";
+      document.getElementById("venueFormName").value = venue ? venue.name : "";
+      document.getElementById("venueFormCloseTime").value = venue ? (venue.closeTime || "05:00") : "05:00";
+      document.getElementById("venueFormInterval").value = String(venue ? (venue.intervalMin || 15) : 15);
+      document.getElementById("venueFormActive").checked = venue ? Boolean(venue.active) : true;
+      document.getElementById("venueModal").classList.remove("hidden");
+    }
+
+    async function saveVenueForm(e) {
+      e.preventDefault();
+      const id = document.getElementById("venueFormId").value.trim();
+      const name = document.getElementById("venueFormName").value.trim();
+      const closeTime = document.getElementById("venueFormCloseTime").value || "05:00";
+      const intervalMin = Number(document.getElementById("venueFormInterval").value) === 30 ? 30 : 15;
+      const active = document.getElementById("venueFormActive").checked;
+
+      if (!name) {
+        showToast("Ingresá el nombre del boliche", "warn");
+        return;
+      }
+
+      const btn = document.getElementById("btnSaveVenue");
+      btn.disabled = true;
+      btn.textContent = "Guardando...";
+
+      try {
+        const now = Date.now();
+        if (id) {
+          const existing = state.venuesMap.get(id);
+          const startedAt = existing?.sessionStartedAt || now;
+          await updateDoc(doc(db, "venues", id), {
+            name,
+            closeTime,
+            intervalMin,
+            active,
+            sessionAutoCloseAt: computeAutoCloseAt(startedAt, closeTime),
+            updatedAt: now,
+          });
+          showToast("Configuración actualizada", "success");
+        } else {
+          const newId = generateVenueId(name);
+          const dateLabel = formatDateYYYYMMDD(new Date(now));
+          await setDoc(doc(db, "venues", newId), {
+            name,
+            active,
+            closeTime,
+            intervalMin,
+            sessionActive: true,
+            sessionId: generateSessionId(dateLabel),
+            sessionDateLabel: dateLabel,
+            sessionStartedAt: now,
+            sessionAutoCloseAt: computeAutoCloseAt(now, closeTime),
+            stats: { inM: 0, inF: 0, outM: 0, outF: 0 },
+            updatedAt: now,
+          });
+          showToast(`Boliche "${name}" creado`, "success");
+        }
+        document.getElementById("venueModal").classList.add("hidden");
+      } catch (err) {
+        console.error("Error guardando boliche:", err);
+        showToast("Error al guardar el boliche", "error");
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "Guardar";
+      }
+    }
+
+    // ---- CONTROL DE NOCHE (ARCHIVAR / REINICIAR) ----
+    function openSessionModal(venue) {
+      state.sessionModalVenueId = venue.id;
+      const s = normalizeStats(venue.stats);
+      document.getElementById("sessionModalVenueName").textContent = venue.name;
+      document.getElementById("sessionModalSummary").innerHTML = `
+        <div class="flex justify-between"><span class="text-zinc-400">Noche actual:</span><strong class="text-white">${formatDatePretty(venue.sessionDateLabel)}</strong></div>
+        <div class="flex justify-between"><span class="text-zinc-400">Ingresos acumulados:</span><strong class="text-emerald-400">${s.totalIn} (${s.inM} H / ${s.inF} M)</strong></div>
+        <div class="flex justify-between"><span class="text-zinc-400">Adentro ahora:</span><strong class="text-white">${s.insideTotal}</strong></div>
+      `;
+      const chk = document.getElementById("sessionArchiveBeforeReset");
+      chk.checked = s.totalIn > 0;
+      document.getElementById("sessionModal").classList.remove("hidden");
+    }
+
+    async function fetchSessionEvents(venueId, sessionId) {
+      if (!sessionId) return [];
+      const q = query(collection(db, "venues", venueId, "events"), where("sessionId", "==", sessionId));
+      const snap = await getDocs(q);
+      const events = [];
+      snap.forEach((d) => events.push({ id: d.id, ...d.data() }));
+      events.sort((a, b) => (a.ts || 0) - (b.ts || 0));
+      return events;
+    }
+
+    async function archiveVenueNight(venue, closeAfter = true) {
+      const events = await fetchSessionEvents(venue.id, venue.sessionId);
+      const series = buildAnalytics(events, venue.intervalMin || 15, venue.stats);
+      const now = Date.now();
+      const nightId = venue.sessionId || generateSessionId(venue.sessionDateLabel || formatDateYYYYMMDD());
+
+      const payload = {
+        venueId: venue.id,
+        venueName: venue.name,
+        sessionId: nightId,
+        dateLabel: venue.sessionDateLabel || formatDateYYYYMMDD(new Date(venue.sessionStartedAt || now)),
+        startedAt: venue.sessionStartedAt || now,
+        closedAt: now,
+        closeTime: venue.closeTime || "05:00",
+        intervalMin: venue.intervalMin || 15,
+        stats: {
+          inM: Number(venue.stats?.inM) || 0,
+          inF: Number(venue.stats?.inF) || 0,
+          outM: Number(venue.stats?.outM) || 0,
+          outF: Number(venue.stats?.outF) || 0,
+        },
+        peakInside: series.kpis.peakInside,
+        peakTime: series.kpis.peakInsideTime,
+        events: events.map((e) => ({
+          ts: Number(e.ts) || now,
+          type: e.type,
+          gender: e.gender,
+          delta: Number(e.delta) || 0,
+          operatorName: e.operatorName || e.operatorEmail || "Operador",
+          operatorEmail: e.operatorEmail || "",
+        })),
+      };
+
+      await setDoc(doc(db, "venues", venue.id, "nights", nightId), payload);
+
+      if (closeAfter) {
+        await updateDoc(doc(db, "venues", venue.id), {
+          sessionActive: false,
+          updatedAt: now,
+        });
+      }
+    }
+
+    async function handleArchiveAndClose() {
+      const venue = state.venuesMap.get(state.sessionModalVenueId);
+      if (!venue) return;
+      const btn = document.getElementById("btnSessionArchiveClose");
+      btn.disabled = true;
+      try {
+        await archiveVenueNight(venue, true);
+        document.getElementById("sessionModal").classList.add("hidden");
+        showToast(`Noche de ${venue.name} archivada y cerrada`, "success");
+      } catch (err) {
+        console.error("Error archivando noche:", err);
+        showToast("Error al archivar la noche", "error");
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    async function handleStartNewNight() {
+      const venue = state.venuesMap.get(state.sessionModalVenueId);
+      if (!venue) return;
+      const shouldArchive = document.getElementById("sessionArchiveBeforeReset").checked;
+      const btn = document.getElementById("btnSessionStartNew");
+      btn.disabled = true;
+      btn.textContent = "Procesando...";
+
+      try {
+        if (shouldArchive) {
+          await archiveVenueNight(venue, false);
+        }
+        const now = Date.now();
+        const dateLabel = formatDateYYYYMMDD(new Date(now));
+        await updateDoc(doc(db, "venues", venue.id), {
+          sessionActive: true,
+          sessionId: generateSessionId(dateLabel),
+          sessionDateLabel: dateLabel,
+          sessionStartedAt: now,
+          sessionAutoCloseAt: computeAutoCloseAt(now, venue.closeTime || "05:00"),
+          stats: { inM: 0, inF: 0, outM: 0, outF: 0 },
+          updatedAt: now,
+        });
+        document.getElementById("sessionModal").classList.add("hidden");
+        showToast(`Nueva noche iniciada en ${venue.name}`, "success");
+      } catch (err) {
+        console.error("Error iniciando nueva noche:", err);
+        showToast("No se pudo iniciar la nueva noche", "error");
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "Iniciar Nueva Noche";
+      }
+    }
+
+    // ---- RENDER TAB: GESTIÓN DE USUARIOS (SUPER ADMIN) ----
+    function renderUsersManageList() {
+      const container = document.getElementById("usersManageList");
+      const users = state.usersList.filter((u) => (u.email || u.id).toLowerCase() !== SUPER_ADMIN_EMAIL.toLowerCase());
+
+      if (users.length === 0) {
+        container.innerHTML = `
+          <div class="bg-panel border border-dashed border-zinc-800 rounded-2xl p-6 text-center text-xs text-zinc-400">
+            Todavía no hay operadores ni dueños cargados. Tocá <strong>+ Nuevo Usuario</strong> para crear el primero.
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = users.map((u) => {
+        const isOwner = u.role === "owner";
+        const roleBadge = isOwner
+          ? `<span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-pink-500/15 text-pink-300 border border-pink-500/30">Dueño</span>`
+          : `<span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-sky-500/15 text-sky-300 border border-sky-500/30">Operador</span>`;
+
+        const vNames = (u.venueIds || []).map((vid) => state.venuesMap.get(vid)?.name || vid);
+        const venueTags = vNames.length
+          ? vNames.map((n) => `<span class="px-2 py-0.5 rounded-md bg-zinc-900 border border-zinc-800 text-[10px] font-semibold text-zinc-300">${escapeHtml(n)}</span>`).join("")
+          : `<span class="text-[10px] text-amber-400 font-semibold">Sin boliche asignado</span>`;
+
+        return `
+          <div class="bg-panel border border-zinc-800 rounded-2xl p-4 space-y-3">
+            <div class="flex items-start justify-between gap-2">
+              <div class="min-w-0">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <h3 class="text-sm font-extrabold text-white truncate">${escapeHtml(u.name || "Sin nombre")}</h3>
+                  ${roleBadge}
+                </div>
+                <p class="text-xs text-zinc-400 truncate mt-0.5">${escapeHtml(u.email || u.id)}</p>
+                <div class="flex flex-wrap gap-1.5 mt-2">${venueTags}</div>
+              </div>
+              <button data-uact="toggle" data-uid="${escapeHtml(u.id)}" type="button" class="um-btn no-select px-2.5 py-1.5 rounded-xl text-[11px] font-bold border shrink-0 ${u.active ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-300" : "bg-rose-500/15 border-rose-500/40 text-rose-300"}">
+                ${u.active ? "Activo" : "Suspendido"}
+              </button>
+            </div>
+
+            <div class="grid grid-cols-3 gap-2 pt-2 border-t border-zinc-800/80">
+              <button data-uact="edit" data-uid="${escapeHtml(u.id)}" type="button" class="um-btn no-select bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-200 text-[11px] font-bold py-2 rounded-xl">
+                Editar
+              </button>
+              <button data-uact="resetpw" data-uid="${escapeHtml(u.id)}" type="button" class="um-btn no-select bg-indigo-500/15 hover:bg-indigo-500/25 border border-indigo-500/40 text-indigo-300 text-[11px] font-bold py-2 rounded-xl">
+                Restablecer clave
+              </button>
+              <button data-uact="delete" data-uid="${escapeHtml(u.id)}" type="button" class="um-btn no-select bg-rose-600/15 hover:bg-rose-600/25 border border-rose-500/40 text-rose-300 text-[11px] font-bold py-2 rounded-xl">
+                Quitar acceso
+              </button>
+            </div>
+          </div>
+        `;
+      }).join("");
+
+      container.querySelectorAll(".um-btn").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+          const uid = btn.dataset.uid;
+          const act = btn.dataset.uact;
+          const userObj = state.usersList.find((x) => x.id === uid);
+          if (!userObj) return;
+
+          if (act === "edit") {
+            openUserModal(userObj);
+          } else if (act === "toggle") {
+            await updateDoc(doc(db, "users", uid), { active: !userObj.active });
+            showToast(userObj.active ? "Cuenta suspendida" : "Cuenta reactivada", "info");
+          } else if (act === "resetpw") {
+            try {
+              await sendPasswordResetEmail(auth, userObj.email || uid);
+              showToast(`Correo de restablecimiento enviado a ${userObj.email || uid}`, "success");
+            } catch (err) {
+              console.error(err);
+              showToast("No se pudo enviar el correo de restablecimiento", "error");
+            }
+          } else if (act === "delete") {
+            const ok = await showConfirmModal(
+              "Quitar acceso de usuario",
+              `Se eliminará el perfil de "${userObj.name}" (${userObj.email || uid}). Ya no podrá entrar a la aplicación.`,
+              "Sí, quitar"
+            );
+            if (!ok) return;
+            try {
+              await deleteDoc(doc(db, "users", uid));
+              showToast("Perfil eliminado", "success");
+            } catch (err) {
+              console.error(err);
+              showToast("No se pudo eliminar el perfil", "error");
+            }
+          }
+        });
+      });
+    }
+
+    function renderUserVenueSelector(role, selectedIds = []) {
+      const container = document.getElementById("userVenuesContainer");
+      const label = document.getElementById("userVenuesLabel");
+      const venues = getSortedVenues();
+
+      label.textContent = role === "owner" ? "Boliches asignados (podés elegir varios)" : "Boliche asignado (elegí uno)";
+
+      if (venues.length === 0) {
+        container.innerHTML = `<p class="text-xs text-amber-400 p-1">Creá al menos un boliche antes de asignar usuarios.</p>`;
+        return;
+      }
+
+      const inputType = role === "owner" ? "checkbox" : "radio";
+      container.innerHTML = venues.map((v) => {
+        const checked = selectedIds.includes(v.id) ? "checked" : "";
+        return `
+          <label class="no-select flex items-center gap-2.5 p-2 rounded-lg hover:bg-zinc-900 cursor-pointer">
+            <input type="${inputType}" name="userVenueSelection" value="${escapeHtml(v.id)}" ${checked} class="w-4 h-4 accent-sky-500" />
+            <span class="text-xs font-semibold text-zinc-200">${escapeHtml(v.name)}</span>
+          </label>
+        `;
+      }).join("");
+    }
+
+    function openUserModal(userObj = null) {
+      const isEdit = Boolean(userObj);
+      document.getElementById("userModalTitle").textContent = isEdit ? "Editar Usuario" : "Nuevo Usuario";
+      document.getElementById("userFormMode").value = isEdit ? "edit" : "create";
+      document.getElementById("userFormName").value = userObj?.name || "";
+      const emailInput = document.getElementById("userFormEmail");
+      emailInput.value = userObj?.email || userObj?.id || "";
+      emailInput.disabled = isEdit;
+
+      const pwRow = document.getElementById("userPasswordRow");
+      const pwInput = document.getElementById("userFormPassword");
+      pwInput.value = "";
+      if (isEdit) {
+        pwRow.classList.add("hidden");
+        pwInput.required = false;
+      } else {
+        pwRow.classList.remove("hidden");
+        pwInput.required = true;
+      }
+
+      const role = userObj?.role || "operator";
+      document.getElementById("userFormRole").value = role;
+      document.getElementById("userFormActive").checked = isEdit ? Boolean(userObj.active) : true;
+      renderUserVenueSelector(role, userObj?.venueIds || []);
+
+      document.getElementById("userModal").classList.remove("hidden");
+    }
+
+    async function saveUserForm(e) {
+      e.preventDefault();
+      const mode = document.getElementById("userFormMode").value;
+      const name = document.getElementById("userFormName").value.trim();
+      const emailLower = document.getElementById("userFormEmail").value.trim().toLowerCase();
+      const password = document.getElementById("userFormPassword").value;
+      const role = document.getElementById("userFormRole").value;
+      const active = document.getElementById("userFormActive").checked;
+
+      const selectedVenues = Array.from(document.querySelectorAll('input[name="userVenueSelection"]:checked')).map((el) => el.value);
+
+      if (!name || !emailLower) {
+        showToast("Completá nombre y correo", "warn");
+        return;
+      }
+      if (emailLower === SUPER_ADMIN_EMAIL.toLowerCase()) {
+        showToast("Ese correo está reservado para el Super Admin", "warn");
+        return;
+      }
+      if (selectedVenues.length === 0) {
+        showToast("Asigná al menos un boliche", "warn");
+        return;
+      }
+      if (mode === "create" && password.length < 6) {
+        showToast("La contraseña debe tener al menos 6 caracteres", "warn");
+        return;
+      }
+
+      const btn = document.getElementById("btnSaveUser");
+      btn.disabled = true;
+      btn.textContent = "Guardando...";
+
+      let alreadyExisted = false;
+
+      try {
+        if (mode === "create") {
+          try {
+            await createUserWithEmailAndPassword(secondaryAuth, emailLower, password);
+            await signOut(secondaryAuth);
+          } catch (authErr) {
+            if (authErr.code === "auth/email-already-in-use") {
+              alreadyExisted = true;
+            } else {
+              throw authErr;
+            }
+          }
+        }
+
+        const existingUser = state.usersList.find((u) => u.id === emailLower);
+        await setDoc(doc(db, "users", emailLower), {
+          email: emailLower,
+          name,
+          role,
+          venueIds: role === "operator" ? [selectedVenues[0]] : selectedVenues,
+          active,
+          createdAt: existingUser?.createdAt || Date.now(),
+        });
+
+        document.getElementById("userModal").classList.add("hidden");
+        if (alreadyExisted) {
+          showToast("El correo ya existía en Auth; se actualizaron sus permisos en la app", "info");
+        } else {
+          showToast(mode === "create" ? "Usuario creado correctamente" : "Usuario actualizado", "success");
+        }
+      } catch (err) {
+        console.error("Error guardando usuario:", err);
+        showToast(translateAuthError(err.code) || "No se pudo guardar el usuario", "error");
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "Guardar Usuario";
+      }
+    }
+
+    // ---- RENDER TAB: HISTORIAL ----
+    function populateHistoryVenueFilter() {
+      const sel = document.getElementById("historyVenueFilter");
+      const current = sel.value || "ALL";
+      const venues = getSortedVenues();
+      sel.innerHTML = `<option value="ALL">Todos los boliches</option>` +
+        venues.map((v) => `<option value="${escapeHtml(v.id)}">${escapeHtml(v.name)}</option>`).join("");
+      if (Array.from(sel.options).some((o) => o.value === current)) {
+        sel.value = current;
+      }
+    }
+
+    async function loadHistoryNights() {
+      const listEl = document.getElementById("historyList");
+      const filterVid = document.getElementById("historyVenueFilter").value;
+      const venues = getSortedVenues();
+      const targetVenues = filterVid === "ALL" ? venues : venues.filter((v) => v.id === filterVid);
+
+      if (targetVenues.length === 0) {
+        listEl.innerHTML = `<div class="bg-panel border border-dashed border-zinc-800 rounded-2xl p-6 text-center text-xs text-zinc-400">No hay boliches disponibles para consultar historial.</div>`;
+        return;
+      }
+
+      listEl.innerHTML = `<div class="py-10 text-center text-xs text-zinc-400">Cargando noches archivadas...</div>`;
+
+      try {
+        const allNights = [];
+        await Promise.all(
+          targetVenues.map(async (v) => {
+            const snap = await getDocs(collection(db, "venues", v.id, "nights"));
+            snap.forEach((d) => {
+              allNights.push({ id: d.id, venueId: v.id, venueName: v.name, ...d.data() });
+            });
+          })
+        );
+
+        allNights.sort((a, b) => (b.closedAt || b.startedAt || 0) - (a.closedAt || a.startedAt || 0));
+        state.historyNights = allNights;
+
+        if (allNights.length === 0) {
+          listEl.innerHTML = `
+            <div class="bg-panel border border-dashed border-zinc-800 rounded-2xl p-8 text-center">
+              <p class="text-sm font-bold text-zinc-200">Sin noches archivadas todavía</p>
+              <p class="text-xs text-zinc-400 mt-1">Cuando se cierre y archive una noche desde el panel de administración, aparecerá acá para ver gráficos y bajar el Excel o PNG.</p>
+            </div>
+          `;
+          return;
+        }
+
+        listEl.innerHTML = allNights.map((n, idx) => {
+          const s = normalizeStats(n.stats);
+          return `
+            <article class="bg-panel border border-zinc-800 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div class="min-w-0">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <h3 class="text-sm font-black text-white truncate">${escapeHtml(n.venueName)}</h3>
+                  <span class="px-2 py-0.5 rounded-md bg-zinc-900 border border-zinc-800 text-[11px] font-bold text-zinc-300 tabular-nums">${formatDatePretty(n.dateLabel)}</span>
+                </div>
+                <div class="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5 text-xs tabular-nums">
+                  <span class="text-zinc-300">Ingresos: <strong class="text-white">${s.totalIn}</strong></span>
+                  <span class="text-sky-400 font-semibold">${s.inM} H (${s.pctInM}%)</span>
+                  <span class="text-pink-400 font-semibold">${s.inF} M (${s.pctInF}%)</span>
+                  <span class="text-amber-300 font-semibold">Pico: ${n.peakInside || 0} (${escapeHtml(n.peakTime || "--:--")})</span>
+                </div>
+              </div>
+              <button data-hidx="${idx}" type="button" class="hist-open-btn no-select bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/40 text-indigo-200 text-xs font-extrabold px-4 py-2.5 rounded-xl shrink-0">
+                Ver Reporte
+              </button>
+            </article>
+          `;
+        }).join("");
+
+        listEl.querySelectorAll(".hist-open-btn").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            const night = state.historyNights[Number(btn.dataset.hidx)];
+            if (night) openArchivedReport(night);
+          });
+        });
+      } catch (err) {
+        console.error("Error cargando historial:", err);
+        listEl.innerHTML = `<div class="bg-rose-950/30 border border-rose-500/40 rounded-2xl p-4 text-xs text-rose-200 text-center">No se pudo cargar el historial.</div>`;
+      }
+    }
+
+    // =========================================================================
+    // 7. MOTOR DE ANALÍTICA, GRÁFICOS CHART.JS Y MODAL DE REPORTE
+    // =========================================================================
+    function buildAnalytics(events, intervalMin = 15, fallbackStats = null) {
+      const sorted = [...(events || [])].sort((a, b) => (a.ts || 0) - (b.ts || 0));
+      const bucketMs = (intervalMin === 30 ? 30 : 15) * 60 * 1000;
+
+      // Desglose por operador
+      const opMap = new Map();
+      for (const ev of sorted) {
+        const key = (ev.operatorEmail || ev.operatorName || "desconocido").toLowerCase();
+        if (!opMap.has(key)) {
+          opMap.set(key, {
+            email: ev.operatorEmail || "",
+            name: ev.operatorName || ev.operatorEmail || "Operador",
+            inM: 0, inF: 0, outM: 0, outF: 0,
+          });
+        }
+        const row = opMap.get(key);
+        const d = Number(ev.delta) || 0;
+        if (ev.type === "in" && ev.gender === "M") row.inM += d;
+        else if (ev.type === "in" && ev.gender === "F") row.inF += d;
+        else if (ev.type === "out" && ev.gender === "M") row.outM += d;
+        else if (ev.type === "out" && ev.gender === "F") row.outF += d;
+      }
+
+      const operators = Array.from(opMap.values()).map((r) => ({
+        ...r,
+        inM: Math.max(0, r.inM),
+        inF: Math.max(0, r.inF),
+        outM: Math.max(0, r.outM),
+        outF: Math.max(0, r.outF),
+        totalIn: Math.max(0, r.inM) + Math.max(0, r.inF),
+        totalOut: Math.max(0, r.outM) + Math.max(0, r.outF),
+      })).sort((a, b) => b.totalIn - a.totalIn);
+
+      if (sorted.length === 0) {
+        const s = normalizeStats(fallbackStats);
+        return {
+          buckets: [],
+          operators,
+          totals: s,
+          kpis: {
+            peakInside: s.insideTotal,
+            peakInsideTime: "--:--",
+            peakInM: 0,
+            peakInMTime: "--:--",
+            peakInF: 0,
+            peakInFTime: "--:--",
+          },
+        };
+      }
+
+      const firstTs = sorted[0].ts;
+      const lastTs = sorted[sorted.length - 1].ts;
+      // Límite de 18h para evitar series enormes ante timestamps dispersos
+      const effectiveStart = Math.max(firstTs, lastTs - 18 * 60 * 60 * 1000);
+      const startBucket = Math.floor(effectiveStart / bucketMs) * bucketMs;
+      let endBucket = Math.floor(lastTs / bucketMs) * bucketMs;
+      if (endBucket === startBucket) endBucket = startBucket + bucketMs;
+
+      const map = new Map();
+      for (let t = startBucket; t <= endBucket; t += bucketMs) {
+        map.set(t, {
+          ts: t,
+          label: formatTimeHHMM(t),
+          inM: 0, inF: 0, outM: 0, outF: 0,
+          cumInM: 0, cumInF: 0,
+          insideM: 0, insideF: 0, insideTotal: 0,
+          pctM: 0, pctF: 0,
+        });
+      }
+
+      let runInM = 0, runInF = 0, runOutM = 0, runOutF = 0;
+      for (const ev of sorted) {
+        const d = Number(ev.delta) || 0;
+        const bKey = Math.floor(ev.ts / bucketMs) * bucketMs;
+        if (bKey < startBucket) {
+          if (ev.type === "in" && ev.gender === "M") runInM += d;
+          else if (ev.type === "in" && ev.gender === "F") runInF += d;
+          else if (ev.type === "out" && ev.gender === "M") runOutM += d;
+          else if (ev.type === "out" && ev.gender === "F") runOutF += d;
+        } else {
+          const b = map.get(bKey);
+          if (b) {
+            if (ev.type === "in" && ev.gender === "M") b.inM += d;
+            else if (ev.type === "in" && ev.gender === "F") b.inF += d;
+            else if (ev.type === "out" && ev.gender === "M") b.outM += d;
+            else if (ev.type === "out" && ev.gender === "F") b.outF += d;
+          }
+        }
+      }
+
+      const buckets = [];
+      let peakInside = 0, peakInsideTime = "--:--";
+      let peakInM = 0, peakInMTime = "--:--";
+      let peakInF = 0, peakInFTime = "--:--";
+
+      for (const b of map.values()) {
+        runInM = Math.max(0, runInM + b.inM);
+        runInF = Math.max(0, runInF + b.inF);
+        runOutM = Math.max(0, runOutM + b.outM);
+        runOutF = Math.max(0, runOutF + b.outF);
+
+        b.inM = Math.max(0, b.inM);
+        b.inF = Math.max(0, b.inF);
+        b.outM = Math.max(0, b.outM);
+        b.outF = Math.max(0, b.outF);
+
+        b.cumInM = runInM;
+        b.cumInF = runInF;
+        b.insideM = Math.max(0, runInM - runOutM);
+        b.insideF = Math.max(0, runInF - runOutF);
+        b.insideTotal = b.insideM + b.insideF;
+        b.pctM = b.insideTotal > 0 ? Math.round((b.insideM / b.insideTotal) * 100) : 0;
+        b.pctF = b.insideTotal > 0 ? 100 - b.pctM : 0;
+
+        if (b.insideTotal > peakInside) {
+          peakInside = b.insideTotal;
+          peakInsideTime = b.label;
+        }
+        if (b.inM > peakInM) {
+          peakInM = b.inM;
+          peakInMTime = b.label;
+        }
+        if (b.inF > peakInF) {
+          peakInF = b.inF;
+          peakInFTime = b.label;
+        }
+        buckets.push(b);
+      }
+
+      const totals = normalizeStats({ inM: runInM, inF: runInF, outM: runOutM, outF: runOutF });
+      return {
+        buckets,
+        operators,
+        totals,
+        kpis: { peakInside, peakInsideTime, peakInM, peakInMTime, peakInF, peakInFTime },
+      };
+    }
+
+    async function openLiveReport(venue) {
+      document.getElementById("reportModal").classList.remove("hidden");
+      document.getElementById("repLoading").classList.remove("hidden");
+      document.getElementById("repBody").classList.add("hidden");
+      document.getElementById("repTitle").textContent = venue.name;
+      document.getElementById("repSubtitle").textContent = `Sesión actual · ${formatDatePretty(venue.sessionDateLabel)}`;
+
+      try {
+        const events = await fetchSessionEvents(venue.id, venue.sessionId);
+        state.reportContext = {
+          mode: "live",
+          venueId: venue.id,
+          venueName: venue.name,
+          dateLabel: venue.sessionDateLabel || formatDateYYYYMMDD(),
+          closeTime: venue.closeTime || "05:00",
+          intervalMin: venue.intervalMin === 30 ? 30 : 15,
+          stats: venue.stats,
+          startedAt: venue.sessionStartedAt,
+          closedAt: null,
+          events,
+        };
+        state.reportChartTab = "all";
+        renderReportModalContent();
+      } catch (err) {
+        console.error("Error cargando reporte en vivo:", err);
+        showToast("Error cargando eventos del reporte", "error");
+        document.getElementById("reportModal").classList.add("hidden");
+      }
+    }
+
+    function openArchivedReport(night) {
+      document.getElementById("reportModal").classList.remove("hidden");
+      document.getElementById("repLoading").classList.add("hidden");
+      document.getElementById("repBody").classList.remove("hidden");
+      document.getElementById("repTitle").textContent = night.venueName || "Boliche";
+      document.getElementById("repSubtitle").textContent = `Archivada · ${formatDatePretty(night.dateLabel)}`;
+
+      state.reportContext = {
+        mode: "archived",
+        venueId: night.venueId,
+        venueName: night.venueName || "Boliche",
+        dateLabel: night.dateLabel || formatDateYYYYMMDD(),
+        closeTime: night.closeTime || "05:00",
+        intervalMin: night.intervalMin === 30 ? 30 : 15,
+        stats: night.stats,
+        startedAt: night.startedAt,
+        closedAt: night.closedAt,
+        events: Array.isArray(night.events) ? night.events : [],
+      };
+      state.reportChartTab = "all";
+      renderReportModalContent();
+    }
+
+    function getCommonChartOptions(yTitle, extraTooltipFn = null) {
+      return {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: "index", intersect: false },
+        plugins: {
+          legend: {
+            position: "top",
+            labels: {
+              color: "#d4d4d8",
+              usePointStyle: true,
+              boxWidth: 8,
+              font: { family: "Inter", size: 11, weight: "600" },
+            },
+          },
+          tooltip: {
+            backgroundColor: "rgba(17, 19, 24, 0.96)",
+            titleColor: "#ffffff",
+            bodyColor: "#e4e4e7",
+            borderColor: "#3f3f46",
+            borderWidth: 1,
+            padding: 10,
+            callbacks: extraTooltipFn ? { afterBody: extraTooltipFn } : {},
+          },
+        },
+        scales: {
+          x: {
+            grid: { color: "rgba(63, 63, 70, 0.25)" },
+            ticks: { color: "#a1a1aa", font: { family: "Inter", size: 10, weight: "600" }, maxRotation: 45, autoSkip: true, maxTicksLimit: 10 },
+          },
+          y: {
+            beginAtZero: true,
+            title: { display: true, text: yTitle, color: "#71717a", font: { family: "Inter", size: 10, weight: "700" } },
+            grid: { color: "rgba(63, 63, 70, 0.25)" },
+            ticks: { color: "#a1a1aa", precision: 0, font: { family: "Inter", size: 10, weight: "600" } },
+          },
+        },
+      };
+    }
+
+    function applyReportChartTabVisibility() {
+      const tab = state.reportChartTab;
+      document.querySelectorAll(".rep-chart-tab").forEach((btn) => {
+        const active = btn.dataset.chartTab === tab;
+        btn.className = `rep-chart-tab no-select px-2.5 py-1.5 rounded-xl text-[11px] font-bold transition ${active ? "bg-zinc-800 text-white" : "text-zinc-400 hover:text-zinc-200"}`;
+      });
+      document.getElementById("cardChartOcc").classList.toggle("hidden", tab !== "all" && tab !== "occ");
+      document.getElementById("cardChartPeaks").classList.toggle("hidden", tab !== "all" && tab !== "peaks");
+      document.getElementById("cardChartCum").classList.toggle("hidden", tab !== "all" && tab !== "cum");
+
+      // Redimensionar gráficos al mostrar
+      Object.values(state.charts).forEach((c) => {
+        if (c) try { c.resize(); } catch (_) {}
+      });
+    }
+
+    function renderReportModalContent() {
+      const ctx = state.reportContext;
+      if (!ctx) return;
+
+      document.getElementById("repLoading").classList.add("hidden");
+      document.getElementById("repBody").classList.remove("hidden");
+
+      // Botones de intervalo 15/30m
+      const b15 = document.getElementById("btnRepInt15");
+      const b30 = document.getElementById("btnRepInt30");
+      b15.className = `no-select px-2.5 py-1 rounded-lg text-[11px] font-bold ${ctx.intervalMin === 15 ? "bg-zinc-800 text-white" : "text-zinc-400"}`;
+      b30.className = `no-select px-2.5 py-1 rounded-lg text-[11px] font-bold ${ctx.intervalMin === 30 ? "bg-zinc-800 text-white" : "text-zinc-400"}`;
+      document.getElementById("repPeaksSubtitle").textContent = `Ingresos por género cada ${ctx.intervalMin} minutos`;
+
+      const analytics = buildAnalytics(ctx.events, ctx.intervalMin, ctx.stats);
+      const { buckets, operators, totals, kpis } = analytics;
+
+      // KPIs
+      document.getElementById("repKpiIn").textContent = totals.totalIn;
+      document.getElementById("repKpiInSplit").innerHTML = `<span class="text-sky-400">${totals.inM} H (${totals.pctInM}%)</span> · <span class="text-pink-400">${totals.inF} M (${totals.pctInF}%)</span>`;
+      document.getElementById("repKpiPeak").textContent = kpis.peakInside;
+      document.getElementById("repKpiPeakTime").textContent = `Hora: ${kpis.peakInsideTime}`;
+      document.getElementById("repKpiInside").textContent = totals.insideTotal;
+      document.getElementById("repKpiInsideSplit").textContent = `${totals.insideM} H · ${totals.insideF} M`;
+      document.getElementById("repKpiOut").textContent = totals.totalOut;
+      document.getElementById("repKpiOutSplit").textContent = `${totals.outM} H · ${totals.outF} M`;
+
+      // Tabla de desglose por operador
+      const tbody = document.getElementById("repOperatorTableBody");
+      if (operators.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" class="py-4 text-center text-zinc-500">Sin registros de operadores en esta sesión.</td></tr>`;
+      } else {
+        tbody.innerHTML = operators.map((op) => `
+          <tr>
+            <td class="py-2.5 pr-2">
+              <div class="font-bold text-zinc-200 truncate max-w-[140px]">${escapeHtml(op.name)}</div>
+              <div class="text-[10px] text-zinc-500 truncate max-w-[140px]">${escapeHtml(op.email)}</div>
+            </td>
+            <td class="py-2.5 px-1.5 text-right font-bold text-sky-300">${op.inM}</td>
+            <td class="py-2.5 px-1.5 text-right font-bold text-pink-300">${op.inF}</td>
+            <td class="py-2.5 px-1.5 text-right font-extrabold text-emerald-300">${op.totalIn}</td>
+            <td class="py-2.5 pl-1.5 text-right font-bold text-amber-300">${op.totalOut}</td>
+          </tr>
+        `).join("");
+      }
+
+      // Destruir gráficos previos
+      Object.keys(state.charts).forEach((k) => {
+        if (state.charts[k]) {
+          state.charts[k].destroy();
+          state.charts[k] = null;
+        }
+      });
+
+      const noEvBox = document.getElementById("repNoEventsBox");
+      const chartsWrap = document.getElementById("repChartsWrapper");
+      if (buckets.length === 0) {
+        noEvBox.classList.remove("hidden");
+        chartsWrap.classList.add("hidden");
+        return;
+      }
+
+      noEvBox.classList.add("hidden");
+      chartsWrap.classList.remove("hidden");
+
+      // Asegurar todos visibles antes de crear los canvas para evitar 0x0
+      document.getElementById("cardChartOcc").classList.remove("hidden");
+      document.getElementById("cardChartPeaks").classList.remove("hidden");
+      document.getElementById("cardChartCum").classList.remove("hidden");
+
+      const labels = buckets.map((b) => b.label);
+
+      // 1. Ocupación y Proporción
+      const occDatasets = [
+        {
+          label: "Mujeres",
+          data: buckets.map((b) => b.insideF),
+          borderColor: "#f472b6",
+          backgroundColor: "rgba(244, 114, 182, 0.14)",
+          borderWidth: 2.8,
+          tension: 0.35,
+          fill: true,
+          pointRadius: 2.5,
+          pointHoverRadius: 5,
+        },
+        {
+          label: "Hombres",
+          data: buckets.map((b) => b.insideM),
+          borderColor: "#38bdf8",
+          backgroundColor: "rgba(56, 189, 248, 0.14)",
+          borderWidth: 2.8,
+          tension: 0.35,
+          fill: true,
+          pointRadius: 2.5,
+          pointHoverRadius: 5,
+        },
+      ];
+      if (state.reportShowTotal) {
+        occDatasets.push({
+          label: "Total Adentro",
+          data: buckets.map((b) => b.insideTotal),
+          borderColor: "#fbbf24",
+          borderWidth: 2,
+          borderDash: [5, 4],
+          tension: 0.35,
+          fill: false,
+          pointRadius: 0,
+        });
+      }
+
+      state.charts.occ = new Chart(document.getElementById("repChartOcc"), {
+        type: "line",
+        data: { labels, datasets: occDatasets },
+        options: getCommonChartOptions("Personas adentro", (items) => {
+          const idx = items[0]?.dataIndex;
+          if (idx === undefined || !buckets[idx]) return [];
+          const b = buckets[idx];
+          return [`Proporción: ${b.pctF}% Mujeres / ${b.pctM}% Hombres`];
+        }),
+      });
+
+      // 2. Picos de Ingreso
+      state.charts.peaks = new Chart(document.getElementById("repChartPeaks"), {
+        type: "line",
+        data: {
+          labels,
+          datasets: [
+            {
+              label: "Ingresos Mujeres",
+              data: buckets.map((b) => b.inF),
+              borderColor: "#f472b6",
+              backgroundColor: "rgba(244, 114, 182, 0.18)",
+              borderWidth: 2.8,
+              tension: 0.35,
+              fill: true,
+              pointRadius: 3,
+            },
+            {
+              label: "Ingresos Hombres",
+              data: buckets.map((b) => b.inM),
+              borderColor: "#38bdf8",
+              backgroundColor: "rgba(56, 189, 248, 0.18)",
+              borderWidth: 2.8,
+              tension: 0.35,
+              fill: true,
+              pointRadius: 3,
+            },
+          ],
+        },
+        options: getCommonChartOptions(`Ingresos / ${ctx.intervalMin} min`),
+      });
+
+      // 3. Ingresos Acumulados
+      state.charts.cum = new Chart(document.getElementById("repChartCum"), {
+        type: "line",
+        data: {
+          labels,
+          datasets: [
+            {
+              label: "Acumulado Mujeres",
+              data: buckets.map((b) => b.cumInF),
+              borderColor: "#f472b6",
+              backgroundColor: "rgba(244, 114, 182, 0.10)",
+              borderWidth: 2.6,
+              tension: 0.3,
+              fill: true,
+              pointRadius: 2,
+            },
+            {
+              label: "Acumulado Hombres",
+              data: buckets.map((b) => b.cumInM),
+              borderColor: "#38bdf8",
+              backgroundColor: "rgba(56, 189, 248, 0.10)",
+              borderWidth: 2.6,
+              tension: 0.3,
+              fill: true,
+              pointRadius: 2,
+            },
+          ],
+        },
+        options: getCommonChartOptions("Ingresos acumulados"),
+      });
+
+      applyReportChartTabVisibility();
+    }
+
+    // =========================================================================
+    // 8. EXPORTACIÓN PNG (WHATSAPP) Y EXCEL (.xlsx) DE 4 HOJAS
+    // =========================================================================
+    function drawRoundRect(ctx, x, y, w, h, r) {
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.arcTo(x + w, y, x + w, y + h, r);
+      ctx.arcTo(x + w, y + h, x, y + h, r);
+      ctx.arcTo(x, y + h, x, y, r);
+      ctx.arcTo(x, y, x + w, y, r);
+      ctx.closePath();
+    }
+
+    async function renderOffscreenChart(width, height, config) {
+      const c = document.createElement("canvas");
+      c.width = width;
+      c.height = height;
+      const chartCtx = c.getContext("2d");
+      const inst = new Chart(chartCtx, {
+        ...config,
+        options: { ...config.options, responsive: false, animation: false, devicePixelRatio: 1 },
+      });
+      inst.update("none");
+      const url = c.toDataURL("image/png");
+      inst.destroy();
+      return new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.src = url;
+      });
+    }
+
+    async function exportReportPng() {
+      const ctxData = state.reportContext;
+      if (!ctxData) return;
+
+      const { buckets, totals, kpis } = buildAnalytics(ctxData.events, ctxData.intervalMin, ctxData.stats);
+      if (buckets.length === 0) {
+        showToast("No hay movimientos registrados para generar la imagen", "warn");
+        return;
+      }
+
+      showToast("Generando imagen PNG de alta calidad...", "info");
+
+      try {
+        const W = 1080;
+        const H = 1780;
+        const canvas = document.createElement("canvas");
+        canvas.width = W;
+        canvas.height = H;
+        const ctx = canvas.getContext("2d");
+
+        // Fondo AMOLED
+        ctx.fillStyle = "#09090b";
+        ctx.fillRect(0, 0, W, H);
+
+        // Barra superior de acento
+        const grad = ctx.createLinearGradient(0, 0, W, 0);
+        grad.addColorStop(0, "#38bdf8");
+        grad.addColorStop(1, "#f472b6");
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, W, 10);
+
+        const pad = 48;
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "900 44px Inter, sans-serif";
+        ctx.fillText(String(ctxData.venueName || "BOLICHE").toUpperCase(), pad, 78);
+
+        const rangeStr = `${buckets[0].label} a ${buckets[buckets.length - 1].label} hs`;
+        ctx.fillStyle = "#a1a1aa";
+        ctx.font = "600 23px Inter, sans-serif";
+        ctx.fillText(`REPORTE DE PUERTA  ·  ${formatDatePretty(ctxData.dateLabel)}  ·  ${rangeStr}`, pad, 118);
+
+        // 4 Tarjetas KPI
+        const cardW = (W - pad * 2 - 24) / 2;
+        const cardH = 148;
+        const cards = [
+          { title: "TOTAL INGRESOS", val: String(totals.totalIn), sub: `${totals.inF} Mujeres (${totals.pctInF}%) · ${totals.inM} Hombres (${totals.pctInM}%)`, color: "#ffffff" },
+          { title: "PICO DE OCUPACIÓN", val: `${kpis.peakInside} personas`, sub: `Registrado a las ${kpis.peakInsideTime} hs`, color: "#fbbf24" },
+          { title: "PICO INGRESO MUJERES", val: `${kpis.peakInF} / ${ctxData.intervalMin} min`, sub: `Franja pico: ${kpis.peakInFTime} hs`, color: "#f472b6" },
+          { title: "PICO INGRESO HOMBRES", val: `${kpis.peakInM} / ${ctxData.intervalMin} min`, sub: `Franja pico: ${kpis.peakInMTime} hs`, color: "#38bdf8" },
+        ];
+
+        cards.forEach((c, i) => {
+          const x = pad + (i % 2) * (cardW + 24);
+          const y = 152 + Math.floor(i / 2) * (cardH + 20);
+          drawRoundRect(ctx, x, y, cardW, cardH, 22);
+          ctx.fillStyle = "#111318";
+          ctx.fill();
+          ctx.lineWidth = 2;
+          ctx.strokeStyle = "#27272a";
+          ctx.stroke();
+
+          ctx.fillStyle = "#a1a1aa";
+          ctx.font = "700 18px Inter, sans-serif";
+          ctx.fillText(c.title, x + 24, y + 38);
+
+          ctx.fillStyle = c.color;
+          ctx.font = "900 40px Inter, sans-serif";
+          ctx.fillText(c.val, x + 24, y + 92);
+
+          ctx.fillStyle = "#d4d4d8";
+          ctx.font = "600 18px Inter, sans-serif";
+          ctx.fillText(c.sub, x + 24, y + 126);
+        });
+
+        // Barra de proporción H/M
+        const barY = 492;
+        const barW = W - pad * 2;
+        drawRoundRect(ctx, pad, barY, barW, 24, 12);
+        ctx.fillStyle = "#27272a";
+        ctx.fill();
+
+        const wM = (totals.pctInM / 100) * barW;
+        ctx.save();
+        drawRoundRect(ctx, pad, barY, barW, 24, 12);
+        ctx.clip();
+        ctx.fillStyle = "#38bdf8";
+        ctx.fillRect(pad, barY, wM, 24);
+        ctx.fillStyle = "#f472b6";
+        ctx.fillRect(pad + wM, barY, barW - wM, 24);
+        ctx.restore();
+
+        // Render de ambos gráficos
+        const labels = buckets.map((b) => b.label);
+        const boxW = W - pad * 2;
+        const cW = boxW - 48;
+        const cH = 445;
+
+        const exportOpts = (yTxt) => ({
+          plugins: {
+            legend: {
+              position: "top",
+              labels: { color: "#e4e4e7", usePointStyle: true, font: { family: "Inter", size: 20, weight: "700" }, padding: 18 },
+            },
+          },
+          scales: {
+            x: { grid: { color: "rgba(63,63,70,0.35)" }, ticks: { color: "#a1a1aa", font: { family: "Inter", size: 17, weight: "600" }, maxTicksLimit: 12 } },
+            y: {
+              beginAtZero: true,
+              title: { display: true, text: yTxt, color: "#a1a1aa", font: { family: "Inter", size: 17, weight: "700" } },
+              grid: { color: "rgba(63,63,70,0.35)" },
+              ticks: { color: "#a1a1aa", precision: 0, font: { family: "Inter", size: 17, weight: "600" } },
+            },
+          },
+        });
+
+        const imgOcc = await renderOffscreenChart(cW, cH, {
+          type: "line",
+          data: {
+            labels,
+            datasets: [
+              { label: "Mujeres adentro", data: buckets.map((b) => b.insideF), borderColor: "#f472b6", backgroundColor: "rgba(244,114,182,0.16)", borderWidth: 4, tension: 0.35, fill: true, pointRadius: 4 },
+              { label: "Hombres adentro", data: buckets.map((b) => b.insideM), borderColor: "#38bdf8", backgroundColor: "rgba(56,189,248,0.16)", borderWidth: 4, tension: 0.35, fill: true, pointRadius: 4 },
+              { label: "Total adentro", data: buckets.map((b) => b.insideTotal), borderColor: "#fbbf24", borderWidth: 3, borderDash: [8, 6], tension: 0.35, fill: false, pointRadius: 0 },
+            ],
+          },
+          options: exportOpts("Personas adentro"),
+        });
+
+        const imgPeaks = await renderOffscreenChart(cW, cH, {
+          type: "line",
+          data: {
+            labels,
+            datasets: [
+              { label: "Ingresos Mujeres", data: buckets.map((b) => b.inF), borderColor: "#f472b6", backgroundColor: "rgba(244,114,182,0.20)", borderWidth: 4, tension: 0.35, fill: true, pointRadius: 4 },
+              { label: "Ingresos Hombres", data: buckets.map((b) => b.inM), borderColor: "#38bdf8", backgroundColor: "rgba(56,189,248,0.20)", borderWidth: 4, tension: 0.35, fill: true, pointRadius: 4 },
+            ],
+          },
+          options: exportOpts(`Ingresos / ${ctxData.intervalMin} min`),
+        });
+
+        // Card Gráfico 1
+        const g1Y = 546;
+        const gCardH = 550;
+        drawRoundRect(ctx, pad, g1Y, boxW, gCardH, 24);
+        ctx.fillStyle = "#111318";
+        ctx.fill();
+        ctx.strokeStyle = "#27272a";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "800 23px Inter, sans-serif";
+        ctx.fillText("1. OCUPACIÓN Y PROPORCIÓN A LO LARGO DE LA NOCHE", pad + 24, g1Y + 46);
+        ctx.drawImage(imgOcc, pad + 24, g1Y + 72, cW, cH);
+
+        // Card Gráfico 2
+        const g2Y = g1Y + gCardH + 28;
+        drawRoundRect(ctx, pad, g2Y, boxW, gCardH, 24);
+        ctx.fillStyle = "#111318";
+        ctx.fill();
+        ctx.strokeStyle = "#27272a";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "800 23px Inter, sans-serif";
+        ctx.fillText(`2. PICOS DE INGRESO POR FRANJA (${ctxData.intervalMin} MIN)`, pad + 24, g2Y + 46);
+        ctx.drawImage(imgPeaks, pad + 24, g2Y + 72, cW, cH);
+
+        // Footer
+        ctx.fillStyle = "#71717a";
+        ctx.font = "600 20px Inter, sans-serif";
+        ctx.fillText(`Salidas totales: ${totals.totalOut} (${totals.outM} H / ${totals.outF} M)  ·  Adentro al corte: ${totals.insideTotal}`, pad, H - 36);
+
+        const blob = await new Promise((res) => canvas.toBlob((b) => res(b), "image/png", 1.0));
+        const safeName = String(ctxData.venueName || "boliche").toLowerCase().replace(/[^a-z0-9]+/g, "-");
+        const filename = `reporte-${safeName}-${ctxData.dateLabel}.png`;
+        const file = new File([blob], filename, { type: "image/png" });
+
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          try {
+            await navigator.share({
+              files: [file],
+              title: `Reporte ${ctxData.venueName} (${formatDatePretty(ctxData.dateLabel)})`,
+              text: `${ctxData.venueName}: ${totals.totalIn} ingresos (${totals.inF} M / ${totals.inM} H). Pico: ${kpis.peakInside} a las ${kpis.peakInsideTime}.`,
+            });
+            showToast("Imagen lista para compartir", "success");
+            return;
+          } catch (shareErr) {
+            if (shareErr.name === "AbortError") return;
+          }
+        }
+
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 2500);
+        showToast("PNG descargado. ¡Listo para mandar por WhatsApp!", "success");
+      } catch (err) {
+        console.error("Error exportando PNG:", err);
+        showToast("No se pudo generar la imagen PNG", "error");
+      }
+    }
+
+    function exportReportExcel() {
+      const ctxData = state.reportContext;
+      if (!ctxData) return;
+
+      if (typeof XLSX === "undefined") {
+        showToast("Librería Excel no disponible sin conexión", "error");
+        return;
+      }
+
+      const { buckets, operators, totals, kpis } = buildAnalytics(ctxData.events, ctxData.intervalMin, ctxData.stats);
+      if (ctxData.events.length === 0 && totals.totalIn === 0) {
+        showToast("No hay datos para exportar a Excel", "warn");
+        return;
+      }
+
+      try {
+        const wb = XLSX.utils.book_new();
+
+        // Hoja 1: Resumen
+        const wsResumen = XLSX.utils.aoa_to_sheet([
+          ["REPORTE DE PUERTA · MULTI-BOLICHE", ""],
+          ["Boliche", ctxData.venueName],
+          ["Fecha de la noche", formatDatePretty(ctxData.dateLabel)],
+          ["Cierre configurado", `${ctxData.closeTime} hs`],
+          ["Intervalo de franjas", `${ctxData.intervalMin} minutos`],
+          ["", ""],
+          ["MÉTRICA", "VALOR"],
+          ["Total Ingresos", totals.totalIn],
+          ["Ingresos Hombres", `${totals.inM} (${totals.pctInM}%)`],
+          ["Ingresos Mujeres", `${totals.inF} (${totals.pctInF}%)`],
+          ["Total Salidas", totals.totalOut],
+          ["Salidas Hombres", totals.outM],
+          ["Salidas Mujeres", totals.outF],
+          ["Adentro al corte", totals.insideTotal],
+          ["Pico Máximo de Ocupación", kpis.peakInside],
+          ["Horario Pico de Ocupación", kpis.peakInsideTime],
+          ["Pico Ingreso Mujeres (franja)", `${kpis.peakInF} (${kpis.peakInFTime})`],
+          ["Pico Ingreso Hombres (franja)", `${kpis.peakInM} (${kpis.peakInMTime})`],
+        ]);
+        wsResumen["!cols"] = [{ wch: 32 }, { wch: 28 }];
+        XLSX.utils.book_append_sheet(wb, wsResumen, "Resumen");
+
+        // Hoja 2: Evolucion_Franjas
+        const wsFranjas = XLSX.utils.aoa_to_sheet([
+          ["Horario", "Ingresos H", "Ingresos M", "Total Ingresos", "Salidas H", "Salidas M", "Adentro H", "Adentro M", "Total Adentro", "% Hombres", "% Mujeres", "Acum. H", "Acum. M"],
+          ...buckets.map((b) => [b.label, b.inM, b.inF, b.inM + b.inF, b.outM, b.outF, b.insideM, b.insideF, b.insideTotal, `${b.pctM}%`, `${b.pctF}%`, b.cumInM, b.cumInF]),
+        ]);
+        wsFranjas["!cols"] = Array(13).fill({ wch: 15 });
+        XLSX.utils.book_append_sheet(wb, wsFranjas, "Evolucion_Franjas");
+
+        // Hoja 3: Por_Operador
+        const wsOp = XLSX.utils.aoa_to_sheet([
+          ["Operador", "Correo", "Ingresos H", "Ingresos M", "Total Ingresos", "Salidas H", "Salidas M", "Total Salidas"],
+          ...operators.map((op) => [op.name, op.email, op.inM, op.inF, op.totalIn, op.outM, op.outF, op.totalOut]),
+        ]);
+        wsOp["!cols"] = [{ wch: 24 }, { wch: 28 }, { wch: 12 }, { wch: 12 }, { wch: 15 }, { wch: 12 }, { wch: 12 }, { wch: 14 }];
+        XLSX.utils.book_append_sheet(wb, wsOp, "Por_Operador");
+
+        // Hoja 4: Registro_Detallado
+        const sortedEvents = [...ctxData.events].sort((a, b) => (a.ts || 0) - (b.ts || 0));
+        const wsDet = XLSX.utils.aoa_to_sheet([
+          ["Fecha", "Hora Exacta", "Tipo", "Género", "Delta", "Operador", "Correo"],
+          ...sortedEvents.map((ev) => {
+            const d = new Date(ev.ts);
+            return [
+              d.toLocaleDateString("es-AR"),
+              d.toLocaleTimeString("es-AR", { hour12: false }),
+              ev.type === "in" ? "Ingreso" : "Salida",
+              ev.gender === "M" ? "Hombre" : "Mujer",
+              ev.delta,
+              ev.operatorName || "",
+              ev.operatorEmail || "",
+            ];
+          }),
+        ]);
+        wsDet["!cols"] = [{ wch: 13 }, { wch: 13 }, { wch: 11 }, { wch: 11 }, { wch: 9 }, { wch: 22 }, { wch: 26 }];
+        XLSX.utils.book_append_sheet(wb, wsDet, "Registro_Detallado");
+
+        const safeName = String(ctxData.venueName || "boliche").toLowerCase().replace(/[^a-z0-9]+/g, "-");
+        XLSX.writeFile(wb, `reporte-${safeName}-${ctxData.dateLabel}.xlsx`);
+        showToast("Excel (.xlsx) descargado con 4 hojas", "success");
+      } catch (err) {
+        console.error("Error exportando Excel:", err);
+        showToast("Error al generar el Excel", "error");
+      }
+    }
+
+    // =========================================================================
+    // 9. EVENTOS DE INTERFAZ Y ARRANQUE
+    // =========================================================================
+    function bindGlobalEvents() {
+      // Conectividad de red
+      window.addEventListener("online", () => {
+        state.isOnline = true;
+        updateOperatorConnectionUI();
+        showToast("Conexión restablecida · Sincronizando", "success");
+      });
+      window.addEventListener("offline", () => {
+        state.isOnline = false;
+        updateOperatorConnectionUI();
+        showToast("Sin señal · Los toques se guardan en el celular", "warn");
+      });
+
+      // Login
+      document.getElementById("btnTogglePassword").addEventListener("click", () => {
+        const input = document.getElementById("loginPassword");
+        const isPw = input.type === "password";
+        input.type = isPw ? "text" : "password";
+        document.getElementById("eyeIconShow").classList.toggle("hidden", isPw);
+        document.getElementById("eyeIconHide").classList.toggle("hidden", !isPw);
+      });
+
+      document.getElementById("loginForm").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        showLoginError("");
+        const email = document.getElementById("loginEmail").value.trim();
+        const password = document.getElementById("loginPassword").value;
+        if (!email || !password) {
+          showLoginError("Completá correo y contraseña.");
+          return;
+        }
+
+        const btn = document.getElementById("btnLoginSubmit");
+        const txt = document.getElementById("loginBtnText");
+        const spin = document.getElementById("loginBtnSpinner");
+        btn.disabled = true;
+        txt.textContent = "Ingresando...";
+        spin.classList.remove("hidden");
+
+        try {
+          await signInWithEmailAndPassword(auth, email, password);
+          document.getElementById("loginPassword").value = "";
+        } catch (err) {
+          showLoginError(translateAuthError(err.code));
+        } finally {
+          btn.disabled = false;
+          txt.textContent = "Ingresar";
+          spin.classList.add("hidden");
+        }
+      });
+
+      // Logout (Operador y Dashboard)
+      const doLogout = async () => {
+        const ok = await showConfirmModal("Cerrar sesión", "¿Querés salir de tu cuenta en este dispositivo?", "Salir", "bg-zinc-700 hover:bg-zinc-600");
+        if (!ok) return;
+        await signOut(auth);
+      };
+      document.getElementById("btnOpLogout").addEventListener("click", doLogout);
+      document.getElementById("btnDashLogout").addEventListener("click", doLogout);
+
+      // Botones del Operador
+      const btnOpInM = document.getElementById("btnOpInM");
+      const btnOpInF = document.getElementById("btnOpInF");
+      const btnOpOutM = document.getElementById("btnOpOutM");
+      const btnOpOutF = document.getElementById("btnOpOutF");
+
+      btnOpInM.addEventListener("click", () => operatorTap("in", "M", 1, btnOpInM));
+      btnOpInF.addEventListener("click", () => operatorTap("in", "F", 1, btnOpInF));
+      btnOpOutM.addEventListener("click", () => operatorTap("out", "M", 1, btnOpOutM));
+      btnOpOutF.addEventListener("click", () => operatorTap("out", "F", 1, btnOpOutF));
+
+      document.getElementById("btnOpUndoInM").addEventListener("click", (e) => { e.stopPropagation(); operatorTap("in", "M", -1); });
+      document.getElementById("btnOpUndoInF").addEventListener("click", (e) => { e.stopPropagation(); operatorTap("in", "F", -1); });
+      document.getElementById("btnOpUndoOutM").addEventListener("click", (e) => { e.stopPropagation(); operatorTap("out", "M", -1); });
+      document.getElementById("btnOpUndoOutF").addEventListener("click", (e) => { e.stopPropagation(); operatorTap("out", "F", -1); });
+
+      // Navegación del Dashboard
+      document.querySelectorAll(".dash-nav-btn").forEach((btn) => {
+        btn.addEventListener("click", () => switchDashboardTab(btn.dataset.tab));
+      });
+
+      // Boliches y Sesiones
+      document.getElementById("btnNewVenue").addEventListener("click", () => openVenueModal(null));
+      document.getElementById("venueForm").addEventListener("submit", saveVenueForm);
+      document.getElementById("btnSessionArchiveClose").addEventListener("click", handleArchiveAndClose);
+      document.getElementById("btnSessionStartNew").addEventListener("click", handleStartNewNight);
+
+      // Usuarios
+      document.getElementById("btnNewUser").addEventListener("click", () => openUserModal(null));
+      document.getElementById("userFormRole").addEventListener("change", (e) => {
+        const currentSelected = Array.from(document.querySelectorAll('input[name="userVenueSelection"]:checked')).map((el) => el.value);
+        renderUserVenueSelector(e.target.value, e.target.value === "operator" ? currentSelected.slice(0, 1) : currentSelected);
+      });
+      document.getElementById("userForm").addEventListener("submit", saveUserForm);
+
+      // Historial
+      document.getElementById("historyVenueFilter").addEventListener("change", loadHistoryNights);
+      document.getElementById("btnRefreshHistory").addEventListener("click", loadHistoryNights);
+
+      // Modal de Reporte
+      document.getElementById("btnCloseReport").addEventListener("click", () => {
+        document.getElementById("reportModal").classList.add("hidden");
+      });
+      document.querySelectorAll(".rep-chart-tab").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          state.reportChartTab = btn.dataset.chartTab;
+          applyReportChartTabVisibility();
+        });
+      });
+      document.getElementById("btnRepInt15").addEventListener("click", () => {
+        if (!state.reportContext) return;
+        state.reportContext.intervalMin = 15;
+        renderReportModalContent();
+      });
+      document.getElementById("btnRepInt30").addEventListener("click", () => {
+        if (!state.reportContext) return;
+        state.reportContext.intervalMin = 30;
+        renderReportModalContent();
+      });
+      document.getElementById("repToggleTotalLine").addEventListener("change", (e) => {
+        state.reportShowTotal = e.target.checked;
+        renderReportModalContent();
+      });
+      document.getElementById("btnRepExportPng").addEventListener("click", exportReportPng);
+      document.getElementById("btnRepExportExcel").addEventListener("click", exportReportExcel);
+
+      // Cierre genérico de modales
+      document.querySelectorAll("[data-close]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          document.getElementById(btn.dataset.close).classList.add("hidden");
+        });
+      });
+      ["venueModal", "sessionModal", "userModal"].forEach((id) => {
+        document.getElementById(id).addEventListener("click", (e) => {
+          if (e.target.id === id) document.getElementById(id).classList.add("hidden");
+        });
+      });
+
+      // Confirmación modal
+      document.getElementById("btnConfirmCancel").addEventListener("click", () => closeConfirmModal(false));
+      document.getElementById("btnConfirmOk").addEventListener("click", () => closeConfirmModal(true));
+    }
+
+    // Arranque
+    window.addEventListener("DOMContentLoaded", () => {
+      bindGlobalEvents();
+      onAuthStateChanged(auth, (user) => {
+        handleAuthUser(user);
+      });
+    });
+  </script>
+</body>
+</html>
+```
